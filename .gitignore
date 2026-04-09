@@ -1,0 +1,22 @@
+# Credenciales y Contexto (Solicitado por User)
+credentials.json
+.ai_context
+
+# Entorno y Variables
+.env
+*.env
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Proyecto SAI
+scratch/
+*.db
+
+# OS
+.DS_Store
+Thumbs.db

@@ -16,6 +16,8 @@ __pycache__/
 # Proyecto SAI
 scratch/
 *.db
+outbox/
+*.csv
 
 # OS
 .DS_Store

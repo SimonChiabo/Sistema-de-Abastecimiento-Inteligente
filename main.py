@@ -3,6 +3,8 @@ from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 import time
 from core.db_handler import add_to_buffer, Session, OrderBuffer, OrderStatus
+from core.reception import process_reception_feedback
+from warehouse_sync import sync_to_warehouse
 
 def get_accumulated_from_db(sku_id, centro_costo):
     """Obtiene la cantidad total acumulada para un SKU en estado PENDING."""
@@ -109,6 +111,12 @@ def run_orchestrator():
         except Exception as e:
             print(f"   ERROR procesando fila {index} (SKU: {sku_id}): {e}")
             ws_local.update_acell(f'F{index}', f"❌ Error: {str(e)[:20]}")
+
+    # 6. Procesar conciliación operativa (Realidad de lo recibido)
+    process_reception_feedback()
+
+    # 7. Sincronizar con Data Warehouse (Looker Studio)
+    sync_to_warehouse()
 
     print("--- Ciclo SAI Finalizado ---")
 

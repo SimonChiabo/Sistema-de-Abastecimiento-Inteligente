@@ -33,15 +33,7 @@ def seed_and_format():
     ]
     ws_sku.append_rows(sku_data)
 
-    # --- Tarea 3: LOCAL_01 ---
-    print("Poblando LOCAL_01...")
-    ws_local = sh.worksheet("LOCAL_01")
-    local_data = [
-        ["SKU-PAN-01", "Pan de Molde"],
-        ["SKU-LAC-01", "Leche Entera"],
-        ["SKU-LAC-02", "Yogur Natural"]
-    ]
-    ws_local.append_rows(local_data)
+    # Task 3 was LOCAL_01, now removed.
 
     # --- Tarea 4: Formateo Avanzado (Batch Update) ---
     print("Aplicando formatos técnicos...")
@@ -49,25 +41,9 @@ def seed_and_format():
     # IDs de las hojas para las requests
     prov_id = ws_prov.id
     sku_id = ws_sku.id
-    local_id = ws_local.id
 
     requests = [
-        # 1. Checkbox en LOCAL_01 Columna D (index 3) para filas de datos (2 a 100)
-        {
-            "setDataValidation": {
-                "range": {
-                    "sheetId": local_id,
-                    "startRowIndex": 1,
-                    "endRowIndex": 100,
-                    "startColumnIndex": 3,
-                    "endColumnIndex": 4
-                },
-                "rule": {
-                    "condition": {"type": "BOOLEAN"},
-                    "showCustomUi": True
-                }
-            }
-        },
+        # 1. Removed LOCAL_01 checkboxes
         # 2. Formato Moneda en MASTER_SKU Columna F (index 5)
         {
             "repeatCell": {
@@ -88,8 +64,7 @@ def seed_and_format():
         },
         # 3. Ajuste de ancho de columnas automático para todas las hojas
         { "autoResizeDimensions": { "dimensions": { "sheetId": prov_id, "dimension": "COLUMNS", "startIndex": 0, "endIndex": 6 } } },
-        { "autoResizeDimensions": { "dimensions": { "sheetId": sku_id, "dimension": "COLUMNS", "startIndex": 0, "endIndex": 6 } } },
-        { "autoResizeDimensions": { "dimensions": { "sheetId": local_id, "dimension": "COLUMNS", "startIndex": 0, "endIndex": 5 } } }
+        { "autoResizeDimensions": { "dimensions": { "sheetId": sku_id, "dimension": "COLUMNS", "startIndex": 0, "endIndex": 6 } } }
     ]
 
     try:

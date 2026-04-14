@@ -38,8 +38,7 @@ def setup_sai_infrastructure():
     # 2. Configurar pestañas y encabezados
     sheets_config = {
         "MASTER_SKU": ["SKU_ID", "Nombre", "Categoría", "Presentación", "Proveedor_ID", "Precio_Ref"],
-        "MASTER_PROV": ["Proveedor_ID", "Nombre", "Email", "Frecuencia", "Hora_Limite", "Dias_Programados"],
-        "LOCAL_01": ["SKU_ID", "Producto", "Cantidad", "Confirmar", "Estado Log"]
+        "MASTER_PROV": ["Proveedor_ID", "Nombre", "Email", "Frecuencia", "Hora_Limite", "Dias_Programados"]
     }
 
     # Obtener lista de pestañas existentes para no duplicar si hay errores

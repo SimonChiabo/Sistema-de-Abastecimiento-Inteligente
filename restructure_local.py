@@ -99,6 +99,22 @@ def restructure_local_template():
                         "showCustomUi": True
                     }
                 }
+            },
+            # Checkbox en PEDIDOS E2:E100 (Confirmar)
+            {
+                "setDataValidation": {
+                    "range": {
+                        "sheetId": ws_pedidos.id,
+                        "startRowIndex": 1,
+                        "endRowIndex": 100,
+                        "startColumnIndex": 4, # Columna E
+                        "endColumnIndex": 5
+                    },
+                    "rule": {
+                        "condition": {"type": "BOOLEAN"},
+                        "showCustomUi": True
+                    }
+                }
             }
         ]
         

@@ -1,126 +1,120 @@
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-def restructure_local():
-    print("--- Reestructurando LOCAL_01: Implementando Feedback Loop ---")
-    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+def restructure_local_template():
+    print("--- [ARCH] Re-estructurando SAI_Local_Template (Capas) ---")
+    scope = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
     
     try:
         creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
         client = gspread.authorize(creds)
-        sh = client.open("SAI - Sistema de Abastecimiento")
-        ws_local = sh.worksheet("LOCAL_01")
-        print(f"OK: Conectado a {sh.title}")
-    except Exception as e:
-        print(f"ERROR: {e}")
-        return
+        
+        template_sh = client.open("SAI_Local_Template")
+        master_sh = client.open("SAI - Sistema de Abastecimiento")
+        master_id = master_sh.id
+        print(f"OK: Template ID: {template_sh.id}")
 
-    local_id = ws_local.id
+        # 1. Capa de Datos (_DB_INTERNAL)
+        print("Configurando Capa de Datos (_DB_INTERNAL)...")
+        try:
+            ws_db = template_sh.worksheet("_DB_INTERNAL")
+            ws_db.clear()
+        except gspread.WorksheetNotFound:
+            ws_db = template_sh.add_worksheet(title="_DB_INTERNAL", rows="100", cols="10")
+        
+        import_formula = f'=IMPORTRANGE("{master_id}", "MASTER_SKU!A1:F100")'
+        ws_db.update_acell('A1', import_formula)
 
-    # Definimos los nuevos encabezados
-    new_headers = ["SKU_ID", "Producto", "Cantidad", "Acumulado (Pendiente Envío)", "Confirmar", "Estado Log"]
+        # 2. Capa de Interfaz (PEDIDOS)
+        print("Re-configurando Capa de Interfaz (PEDIDOS)...")
+        ws_pedidos = template_sh.worksheet("PEDIDOS")
+        ws_pedidos.clear()
+        ws_pedidos.append_row(["SKU_ID", "Producto", "Cantidad", "Precio Unit", "Confirmar", "Log"])
+        
+        # Formulas XLOOKUP (Filas 2 a 100)
+        # Col A (SKU_ID): Busca B en _DB_INTERNAL Col B, devuelve _DB_INTERNAL Col A
+        # Col D (Precio): Busca B en _DB_INTERNAL Col B, devuelve _DB_INTERNAL Col F
+        formulas_a = [[f'=IF(B{i}="", "", XLOOKUP(B{i}, _DB_INTERNAL!B:B, _DB_INTERNAL!A:A))'] for i in range(2, 101)]
+        formulas_d = [[f'=IF(B{i}="", "", XLOOKUP(B{i}, _DB_INTERNAL!B:B, _DB_INTERNAL!F:F))'] for i in range(2, 101)]
+        
+        ws_pedidos.update(range_name='A2:A101', values=formulas_a, value_input_option='USER_ENTERED')
+        ws_pedidos.update(range_name='D2:D101', values=formulas_d, value_input_option='USER_ENTERED')
+        
+        # 3. Capa de Inventario (STOCK)
+        print("Configurando Capa de Inventario (STOCK)...")
+        try:
+            ws_stock = template_sh.worksheet("STOCK")
+            ws_stock.clear()
+        except gspread.WorksheetNotFound:
+            ws_stock = template_sh.add_worksheet(title="STOCK", rows="100", cols="10")
+        
+        ws_stock.append_row(["SKU_ID", "Producto", "Stock_Fisico", "Notas"])
+        
+        # Referencias directas a _DB_INTERNAL
+        ref_a = [[f'=_DB_INTERNAL!A{i}'] for i in range(2, 101)]
+        ref_b = [[f'=_DB_INTERNAL!B{i}'] for i in range(2, 101)]
+        ws_stock.update(range_name='A2:A101', values=ref_a, value_input_option='USER_ENTERED')
+        ws_stock.update(range_name='B2:B101', values=ref_b, value_input_option='USER_ENTERED')
 
-    requests = [
-        # 1. Insertar una columna en la posición D (index 3)
-        {
-            "insertDimension": {
-                "range": {
-                    "sheetId": local_id,
-                    "dimension": "COLUMNS",
-                    "startIndex": 3,
-                    "endIndex": 4
-                },
-                "inheritFromBefore": True
-            }
-        },
-        # 2. Actualizar todos los encabezados
-        {
-            "updateCells": {
-                "range": {
-                    "sheetId": local_id,
-                    "startRowIndex": 0,
-                    "endRowIndex": 1,
-                    "startColumnIndex": 0,
-                    "endColumnIndex": 6
-                },
-                "rows": [
-                    {
-                        "values": [{"userEnteredValue": {"stringValue": h}} for h in new_headers]
+        # 4. Capa de Calidad (RECEPCION)
+        print("Configurando Capa de Calidad (RECEPCION)...")
+        try:
+            ws_rec = template_sh.worksheet("RECEPCION")
+            ws_rec.clear()
+        except gspread.WorksheetNotFound:
+            ws_rec = template_sh.add_worksheet(title="RECEPCION", rows="100", cols="15")
+        ws_rec.append_row(["ID_Pedido", "SKU_ID", "Producto", "Cant_Pedida", "Cant_Recibida", "Estado_Articulo", "Notas"])
+
+        # 5. Seguridad y UX
+        print("Aplicando caps de seguridad y UX...")
+        requests = [
+            # Ocultar _DB_INTERNAL
+            {
+                "updateSheetProperties": {
+                    "properties": {
+                        "sheetId": ws_db.id,
+                        "hidden": True
+                    },
+                    "fields": "hidden"
+                }
+            },
+            # Dropdown en PEDIDOS B2:B100 desde _DB_INTERNAL!B2:B100
+            {
+                "setDataValidation": {
+                    "range": {
+                        "sheetId": ws_pedidos.id,
+                        "startRowIndex": 1,
+                        "endRowIndex": 100,
+                        "startColumnIndex": 1,
+                        "endColumnIndex": 2
+                    },
+                    "rule": {
+                        "condition": {
+                            "type": "ONE_OF_RANGE",
+                            "values": [{"userEnteredValue": "=_DB_INTERNAL!$B$2:$B$100"}]
+                        },
+                        "showCustomUi": True
                     }
-                ],
-                "fields": "userEnteredValue"
-            }
-        },
-        # 3. Formatear la nueva columna D como Gris (Solo Lectura)
-        {
-            "repeatCell": {
-                "range": {
-                    "sheetId": local_id,
-                    "startRowIndex": 1,
-                    "endRowIndex": 100,
-                    "startColumnIndex": 3,
-                    "endColumnIndex": 4
-                },
-                "cell": {
-                    "userEnteredFormat": {
-                        "backgroundColor": {"red": 0.95, "green": 0.95, "blue": 0.95}
-                    }
-                },
-                "fields": "userEnteredFormat.backgroundColor"
-            }
-        },
-        # 4. Asegurar Checkbox en la NUEVA posición E (index 4)
-        {
-            "setDataValidation": {
-                "range": {
-                    "sheetId": local_id,
-                    "startRowIndex": 1,
-                    "endRowIndex": 100,
-                    "startColumnIndex": 4,
-                    "endColumnIndex": 5
-                },
-                "rule": {
-                    "condition": {"type": "BOOLEAN"},
-                    "showCustomUi": True
                 }
             }
-        },
-        # 5. Añadir Nota en D1
-        {
-            "updateCells": {
-                "range": {
-                    "sheetId": local_id,
-                    "startRowIndex": 0,
-                    "endRowIndex": 1,
-                    "startColumnIndex": 3,
-                    "endColumnIndex": 4
-                },
-                "rows": [
-                    {
-                        "values": [
-                            {
-                                "note": "Cantidad ya procesada por el sistema y en espera de despacho al proveedor"
-                            }
-                        ]
-                    }
-                ],
-                "fields": "note"
-            }
-        }
-    ]
+        ]
+        
+        # Formateo de Headers (Azul oscuro para todos)
+        for ws in [ws_pedidos, ws_stock, ws_rec]:
+            ws.format('A1:Z1', {
+                'textFormat': {'bold': True, 'foregroundColor': {'red': 1, 'green': 1, 'blue': 1}},
+                'backgroundColor': {'red': 0, 'green': 0.2, 'blue': 0.5},
+                'horizontalAlignment': 'CENTER'
+            })
 
-    try:
-        sh.batch_update({"requests": requests})
-        print("OK: Estructura de LOCAL_01 actualizada exitosamente.")
-        
-        # Verificamos/Refrescamos la fórmula en A2 para asegurarnos de que no se rompió por el shift
-        # Aunque Google Sheets suele ajustarlo, re-insertarla garantiza integridad técnica.
-        formula = '=ARRAYFORMULA(IF(ISBLANK(B2:B), "", XLOOKUP(B2:B, MASTER_SKU!B:B, MASTER_SKU!A:A, "ERR")))'
-        ws_local.update_acell('A2', formula)
-        print("OK: Integridad de ARRAYFORMULA verificada.")
-        
+        template_sh.batch_update({"requests": requests})
+        print("\n--- ✅ Re-estructuracion Arquitectonica Completada ---")
+
     except Exception as e:
-        print(f"ERROR en batch_update: {e}")
+        print(f"ERROR: {e}")
 
 if __name__ == "__main__":
-    restructure_local()
+    restructure_local_template()

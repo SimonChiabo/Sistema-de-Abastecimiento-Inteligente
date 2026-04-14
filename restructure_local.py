@@ -32,16 +32,14 @@ def restructure_local_template():
         print("Re-configurando Capa de Interfaz (PEDIDOS)...")
         ws_pedidos = template_sh.worksheet("PEDIDOS")
         ws_pedidos.clear()
-        ws_pedidos.append_row(["SKU_ID", "Producto", "Cantidad", "Precio Unit", "Confirmar", "Log"])
+        ws_pedidos.append_row(["SKU_ID", "Producto", "Cantidad", "Pedidos Acumulados", "Confirmar", "Log"])
         
         # Formulas XLOOKUP (Filas 2 a 100)
         # Col A (SKU_ID): Busca B en _DB_INTERNAL Col B, devuelve _DB_INTERNAL Col A
-        # Col D (Precio): Busca B en _DB_INTERNAL Col B, devuelve _DB_INTERNAL Col F
+        # (Column D will be updated by the bot, no initial formula)
         formulas_a = [[f'=IF(B{i}="", "", XLOOKUP(B{i}, _DB_INTERNAL!B:B, _DB_INTERNAL!A:A))'] for i in range(2, 101)]
-        formulas_d = [[f'=IF(B{i}="", "", XLOOKUP(B{i}, _DB_INTERNAL!B:B, _DB_INTERNAL!F:F))'] for i in range(2, 101)]
         
         ws_pedidos.update(range_name='A2:A101', values=formulas_a, value_input_option='USER_ENTERED')
-        ws_pedidos.update(range_name='D2:D101', values=formulas_d, value_input_option='USER_ENTERED')
         
         # 3. Capa de Inventario (STOCK)
         print("Configurando Capa de Inventario (STOCK)...")

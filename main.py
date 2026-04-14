@@ -93,6 +93,7 @@ def run_orchestrator():
                     new_accumulated = get_accumulated_from_db(sku_id, local_name)
                     updates = [
                         {'range': f'C{index}', 'values': [['']]},           # Limpiar Cantidad
+                        {'range': f'D{index}', 'values': [[new_accumulated]]}, # Actualizar Acumulado informativo
                         {'range': f'E{index}', 'values': [[False]]},        # Desmarcar Checkbox
                         {'range': f'F{index}', 'values': [[log_msg]]}         # Log Status
                     ]

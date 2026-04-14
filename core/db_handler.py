@@ -43,6 +43,26 @@ class OrderHistory(Base):
     received_quantity = Column(Float)
     incident_notes = Column(String)
 
+class MasterProv(Base):
+    __tablename__ = "master_prov"
+    
+    proveedor_id = Column(String, primary_key=True)
+    nombre = Column(String, nullable=False)
+    email = Column(String)
+    frecuencia = Column(String)
+    hora_limite = Column(String)
+    dias_programados = Column(String) # Guardado como string JSON o lista
+
+class MasterSku(Base):
+    __tablename__ = "master_sku"
+    
+    sku_id = Column(String, primary_key=True)
+    nombre = Column(String, nullable=False)
+    categoria = Column(String)
+    presentacion = Column(String)
+    proveedor_id = Column(String)
+    precio_ref = Column(Float)
+
 # Inicializar Base de Datos
 Base.metadata.create_all(engine)
 

@@ -1,6 +1,6 @@
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from core.db_handler import Session, OrderHistory
+from core.db_handler import Session, OrderHistory, MasterProv, MasterSku
 from datetime import datetime
 
 def sync_to_warehouse():
@@ -17,7 +17,6 @@ def sync_to_warehouse():
         print(f"OK: Conectado al Warehouse {sh.title}")
     except Exception as e:
         print(f"ERROR: No se pudo conectar al Warehouse. {e}")
-        print("Asegúrate de que sai-bot esté compartido como editor en el nuevo ID.")
         return
 
     # 1. Preparar Pestaña Maestro
@@ -32,8 +31,8 @@ def sync_to_warehouse():
     
     # Encabezados
     headers = [
-        "ID", "SKU_ID", "Centro_Costo", "Cant_Pedida", "Cant_Recibida", 
-        "Proveedor_ID", "Fecha_Pedido", "Fecha_Archivo", "Precio_Unit", 
+        "ID", "SKU_ID", "SKU_Nombre", "Centro_Costo", "Cant_Pedida", "Cant_Recibida", 
+        "Proveedor_ID", "Proveedor_Nombre", "Fecha_Pedido", "Fecha_Archivo", "Precio_Unit", 
         "Total_Linea", "Status_Cumplimiento", "Notas"
     ]
     ws.append_row(headers)
@@ -46,22 +45,29 @@ def sync_to_warehouse():
     # 2. Extraer datos de SQLite
     session = Session()
     try:
-        history = session.query(OrderHistory).all()
-        if not history:
+        # Realizar JOIN para traer el nombre del proveedor y del producto
+        results = session.query(OrderHistory, MasterProv.nombre, MasterSku.nombre).\
+            outerjoin(MasterProv, OrderHistory.proveedor_id == MasterProv.proveedor_id).\
+            outerjoin(MasterSku, OrderHistory.sku_id == MasterSku.sku_id).\
+            all()
+            
+        if not results:
             print("No hay datos históricos para sincronizar.")
             return
 
         rows = []
-        for h in history:
+        for h, provider_name, sku_name in results:
             rows.append([
                 h.id,
                 h.sku_id,
+                sku_name or "Sku Desconocido",
                 h.centro_costo,
                 h.cantidad,
                 h.received_quantity,
                 h.proveedor_id,
-                h.fecha_registro.strftime("%Y-%m-%d"),
-                h.fecha_archivo.strftime("%Y-%m-%d"),
+                provider_name or "Prov Desconocido",
+                h.fecha_registro.strftime("%Y-%m-%d") if h.fecha_registro else "",
+                h.fecha_archivo.strftime("%Y-%m-%d") if h.fecha_archivo else "",
                 h.precio_compra_final,
                 h.total_linea,
                 h.fulfillment_status,

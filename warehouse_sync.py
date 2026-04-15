@@ -1,87 +1,117 @@
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-from core.db_handler import Session, OrderHistory, MasterProv, MasterSku
-from datetime import datetime
+"""
+warehouse_sync.py — Sincronización del historial de pedidos al Data Warehouse BI.
+El ID del spreadsheet destino se lee desde WAREHOUSE_SPREADSHEET_ID en .env.
+"""
+import logging
+import os
 
-def sync_to_warehouse():
-    print("--- Sincronizando Data Warehouse (BI) ---")
-    
-    # ID proporcionado por el arquitecto
-    WAREHOUSE_ID = "1q0-FbUQnid2kYvlj9UYLQMnxi_frLN7hsy2cfHD4T00"
-    
-    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    try:
-        creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
-        client = gspread.authorize(creds)
-        sh = client.open_by_key(WAREHOUSE_ID)
-        print(f"OK: Conectado al Warehouse {sh.title}")
-    except Exception as e:
-        print(f"ERROR: No se pudo conectar al Warehouse. {e}")
+from dotenv import load_dotenv
+
+from core.auth import obtener_cliente_gsheets
+from core.db_handler import MasterProv, MasterSku, OrderHistory, Session
+
+load_dotenv()
+
+logger = logging.getLogger(__name__)
+
+
+def sync_to_warehouse() -> None:
+    """Vuelca todo el historial de OrderHistory al spreadsheet de BI con JOINs de nombres."""
+    # Verificar si la sincronización está habilitada
+    habilitado = os.getenv("WAREHOUSE_SYNC_ENABLED", "false").lower()
+    if habilitado != "true":
+        logger.info("Sincronización de warehouse deshabilitada (WAREHOUSE_SYNC_ENABLED=false).")
         return
 
-    # 1. Preparar Pestaña Maestro
-    sheet_name = "HOJA_MAESTRA_BI"
+    id_warehouse = os.getenv("WAREHOUSE_SPREADSHEET_ID")
+    if not id_warehouse:
+        logger.warning(
+            "WAREHOUSE_SPREADSHEET_ID no configurado en .env. "
+            "Sincronización de warehouse omitida."
+        )
+        return
+
+    logger.info("Sincronizando data warehouse (BI)...")
+
     try:
-        ws = sh.worksheet(sheet_name)
-    except gspread.WorksheetNotFound:
-        ws = sh.add_worksheet(title=sheet_name, rows="1000", cols="15")
-        print(f"Pestaña {sheet_name} creada.")
+        cliente = obtener_cliente_gsheets()
+        sh = cliente.open_by_key(id_warehouse)
+        logger.info("Conectado al warehouse: %s", sh.title)
+    except Exception as error:
+        logger.error("No se pudo conectar al warehouse: %s", error)
+        return
+
+    # Preparar pestaña maestra
+    nombre_hoja = "HOJA_MAESTRA_BI"
+    try:
+        ws = sh.worksheet(nombre_hoja)
+    except Exception:
+        ws = sh.add_worksheet(title=nombre_hoja, rows="1000", cols="15")
+        logger.info("Pestaña '%s' creada.", nombre_hoja)
 
     ws.clear()
-    
-    # Encabezados
-    headers = [
-        "ID", "SKU_ID", "SKU_Nombre", "Centro_Costo", "Cant_Pedida", "Cant_Recibida", 
-        "Proveedor_ID", "Proveedor_Nombre", "Fecha_Pedido", "Fecha_Archivo", "Precio_Unit", 
-        "Total_Linea", "Status_Cumplimiento", "Notas"
-    ]
-    ws.append_row(headers)
-    ws.format('A1:Z1', {
-        'textFormat': {'bold': True, 'foregroundColor': {'red': 1, 'green': 1, 'blue': 1}},
-        'backgroundColor': {'red': 0.1, 'green': 0.1, 'blue': 0.1},
-        'horizontalAlignment': 'CENTER'
-    })
 
-    # 2. Extraer datos de SQLite
+    encabezados = [
+        "ID", "SKU_ID", "SKU_Nombre", "Centro_Costo", "Cant_Pedida", "Cant_Recibida",
+        "Proveedor_ID", "Proveedor_Nombre", "Fecha_Pedido", "Fecha_Archivo",
+        "Precio_Unit", "Total_Linea", "Status_Cumplimiento", "Notas",
+    ]
+    ws.append_row(encabezados)
+    ws.format(
+        "A1:Z1",
+        {
+            "textFormat": {
+                "bold": True,
+                "foregroundColor": {"red": 1, "green": 1, "blue": 1},
+            },
+            "backgroundColor": {"red": 0.1, "green": 0.1, "blue": 0.1},
+            "horizontalAlignment": "CENTER",
+        },
+    )
+
+    # Extraer datos de SQLite con JOINs
     session = Session()
     try:
-        # Realizar JOIN para traer el nombre del proveedor y del producto
-        results = session.query(OrderHistory, MasterProv.nombre, MasterSku.nombre).\
-            outerjoin(MasterProv, OrderHistory.proveedor_id == MasterProv.proveedor_id).\
-            outerjoin(MasterSku, OrderHistory.sku_id == MasterSku.sku_id).\
-            all()
-            
-        if not results:
-            print("No hay datos históricos para sincronizar.")
+        resultados = (
+            session.query(OrderHistory, MasterProv.nombre, MasterSku.nombre)
+            .outerjoin(MasterProv, OrderHistory.proveedor_id == MasterProv.proveedor_id)
+            .outerjoin(MasterSku, OrderHistory.sku_id == MasterSku.sku_id)
+            .all()
+        )
+
+        if not resultados:
+            logger.info("No hay datos históricos para sincronizar.")
             return
 
-        rows = []
-        for h, provider_name, sku_name in results:
-            rows.append([
+        filas = []
+        for h, nombre_prov, nombre_sku in resultados:
+            filas.append([
                 h.id,
                 h.sku_id,
-                sku_name or "Sku Desconocido",
+                nombre_sku or "SKU Desconocido",
                 h.centro_costo,
                 h.cantidad,
                 h.received_quantity,
                 h.proveedor_id,
-                provider_name or "Prov Desconocido",
+                nombre_prov or "Proveedor Desconocido",
                 h.fecha_registro.strftime("%Y-%m-%d") if h.fecha_registro else "",
                 h.fecha_archivo.strftime("%Y-%m-%d") if h.fecha_archivo else "",
                 h.precio_compra_final,
                 h.total_linea,
                 h.fulfillment_status,
-                h.incident_notes or ""
+                h.incident_notes or "",
             ])
-        
-        # 3. Inyección Masiva
-        ws.append_rows(rows, value_input_option='RAW')
-        print(f"OK: {len(rows)} registros inyectados en el Warehouse.")
-        
-    except Exception as e:
-        print(f"ERROR en inyección: {e}")
+
+        ws.append_rows(filas, value_input_option="RAW")
+        logger.info("%d registros inyectados en el warehouse.", len(filas))
+
+    except Exception as error:
+        logger.error("Error en inyección al warehouse: %s", error)
     finally:
         session.close()
 
+
 if __name__ == "__main__":
+    from core.log_config import configurar_logging
+    configurar_logging()
     sync_to_warehouse()

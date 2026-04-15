@@ -1,117 +1,147 @@
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-from datetime import datetime
-import time
-from core.db_handler import add_to_buffer, Session, OrderBuffer, OrderStatus
-from core.reception import process_reception_feedback
-from warehouse_sync import sync_to_warehouse
+"""
+main.py — Orquestador principal del ciclo SAI Multi-Local.
+Lee pedidos de cada spreadsheet local, los consolida en SQLite,
+procesa el feedback de recepción y sincroniza el warehouse.
+"""
+import logging
+import os
 
-def get_accumulated_from_db(sku_id, centro_costo):
+from dotenv import load_dotenv
+
+from core.auth import obtener_cliente_gsheets, obtener_spreadsheet_maestro
+from core.db_handler import OrderBuffer, OrderStatus, Session, add_to_buffer
+from core.log_config import configurar_logging
+from core.reception import process_reception_feedback
+
+load_dotenv()
+
+logger = logging.getLogger(__name__)
+
+PREFIJO_LOCAL = os.getenv("LOCAL_PREFIX", "SAI_Local_")
+
+
+def _obtener_acumulado_de_db(sku_id: str, centro_costo: str) -> float:
     """Obtiene la cantidad total acumulada para un SKU en estado PENDING."""
     session = Session()
     try:
-        order = session.query(OrderBuffer).filter(
-            OrderBuffer.sku_id == sku_id,
-            OrderBuffer.centro_costo == centro_costo,
-            OrderBuffer.status == OrderStatus.PENDING
-        ).first()
-        return order.cantidad if order else 0
+        pedido = (
+            session.query(OrderBuffer)
+            .filter(
+                OrderBuffer.sku_id == sku_id,
+                OrderBuffer.centro_costo == centro_costo,
+                OrderBuffer.status == OrderStatus.PENDING,
+            )
+            .first()
+        )
+        return pedido.cantidad if pedido else 0
     finally:
         session.close()
 
-def run_orchestrator():
-    print(f"--- [MAIN] Iniciando Ciclo SAI Multi-Local: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---")
-    
-    # 1. Conexión y Descubrimiento de Locales
-    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+
+def run_orchestrator() -> None:
+    """Ejecuta el ciclo completo SAI: lectura de pedidos → buffer → feedback → warehouse."""
+    from datetime import datetime
+
+    logger.info(
+        "Iniciando ciclo SAI Multi-Local: %s",
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    )
+
+    # 1. Conexión y descubrimiento de locales
     try:
-        creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
-        client = gspread.authorize(creds)
-        
-        # Cargar Maestros (Hub Central)
-        sh_master = client.open("SAI - Sistema de Abastecimiento")
-        skus = sh_master.worksheet("MASTER_SKU").get_all_records()
-        provs = sh_master.worksheet("MASTER_PROV").get_all_records()
-        
-        sku_to_prov = {str(r['SKU_ID']).strip(): str(r['Proveedor_ID']).strip() for r in skus}
-        prov_deadlines = {str(r['Proveedor_ID']).strip(): str(r['Hora_Limite']).strip() for r in provs}
-        
-        # Escaneo dinámico de Spreadsheets de Locales
-        all_files = client.list_spreadsheet_files()
-        local_files = [f for f in all_files if f['name'].startswith("SAI_Local_")]
-        print(f"OK: Se encontraron {len(local_files)} locales para procesar.")
-        
-    except Exception as e:
-        print(f"CRITICAL ERROR: No se pudo conectar al ecosistema. {e}")
+        cliente = obtener_cliente_gsheets()
+        sh_maestro = obtener_spreadsheet_maestro()
+
+        skus = sh_maestro.worksheet("MASTER_SKU").get_all_records()
+        proveedores = sh_maestro.worksheet("MASTER_PROV").get_all_records()
+
+        sku_a_prov = {str(r["SKU_ID"]).strip(): str(r["Proveedor_ID"]).strip() for r in skus}
+        hora_limite_prov = {
+            str(r["Proveedor_ID"]).strip(): str(r["Hora_Limite"]).strip()
+            for r in proveedores
+        }
+
+        todos_los_archivos = cliente.list_spreadsheet_files()
+        archivos_locales = [f for f in todos_los_archivos if f["name"].startswith(PREFIJO_LOCAL)]
+        logger.info("Se encontraron %d locales para procesar.", len(archivos_locales))
+
+    except Exception as error:
+        logger.error("Error crítico: no se pudo conectar al ecosistema. %s", error)
         return
 
-    # 2. Procesar cada Local
-    for entry in local_files:
-        local_name = entry['name']
-        print(f"\n>> Procesando Local: {local_name}")
-        
-        try:
-            sh_local = client.open_by_key(entry['id'])
-            ws_pedidos = sh_local.worksheet("PEDIDOS")
-            
-            # Leer pedidos (Layout: SKU, Prod, Cant, Prec, Conf, Log)
-            rows = ws_pedidos.get_all_values()
-            if len(rows) < 2: continue
-            
-            data_rows = rows[1:]
-            
-            for index, row in enumerate(data_rows, start=2):
-                try:
-                    sku_id = str(row[0]).strip()
-                    cantidad_str = str(row[2]).strip()
-                    confirmado = str(row[4]).upper() == "TRUE"
-                    
-                    if not confirmado or not sku_id or not cantidad_str or cantidad_str == "":
-                        continue
-                    
-                    print(f"   [SKU: {sku_id}] Cant: {cantidad_str}")
-                    cantidad = float(cantidad_str.replace(',', '.'))
-                    
-                    # Logica de Horarios
-                    prov_id = sku_to_prov.get(sku_id)
-                    hora_limite_str = prov_deadlines.get(prov_id, "23:59")
-                    
-                    now_time = datetime.now().time()
-                    limit_time = datetime.strptime(hora_limite_str, "%H:%M").time()
-                    
-                    status = OrderStatus.PENDING
-                    log_msg = f"OK {datetime.now().strftime('%H:%M')}"
-                    
-                    if now_time > limit_time:
-                        status = OrderStatus.LATE
-                        log_msg = f"LATE ({hora_limite_str})"
+    # 2. Procesar cada local
+    from datetime import datetime as dt
 
-                    # Registrar en DB Local
-                    add_to_buffer(sku_id, cantidad, local_name, proveedor_id=prov_id)
-                    
-                    # Feedback al Local Sheet
-                    new_accumulated = get_accumulated_from_db(sku_id, local_name)
-                    updates = [
-                        {'range': f'C{index}', 'values': [['']]},           # Limpiar Cantidad
-                        {'range': f'D{index}', 'values': [[new_accumulated]]}, # Actualizar Acumulado informativo
-                        {'range': f'E{index}', 'values': [[False]]},        # Desmarcar Checkbox
-                        {'range': f'F{index}', 'values': [[log_msg]]}         # Log Status
+    for entrada in archivos_locales:
+        nombre_local = entrada["name"]
+        logger.info("Procesando local: %s", nombre_local)
+
+        try:
+            sh_local = cliente.open_by_key(entrada["id"])
+            ws_pedidos = sh_local.worksheet("PEDIDOS")
+
+            filas = ws_pedidos.get_all_values()
+            if len(filas) < 2:
+                continue
+
+            for indice, fila in enumerate(filas[1:], start=2):
+                try:
+                    sku_id = str(fila[0]).strip()
+                    cantidad_str = str(fila[2]).strip()
+                    confirmado = str(fila[4]).upper() == "TRUE"
+
+                    if not confirmado or not sku_id or not cantidad_str:
+                        continue
+
+                    logger.info("  [SKU: %s] Cantidad: %s", sku_id, cantidad_str)
+                    cantidad = float(cantidad_str.replace(",", "."))
+
+                    # Lógica de horarios
+                    prov_id = sku_a_prov.get(sku_id)
+                    hora_limite_str = hora_limite_prov.get(prov_id, "23:59")
+
+                    ahora = dt.now().time()
+                    hora_limite = dt.strptime(hora_limite_str, "%H:%M").time()
+
+                    estatus = OrderStatus.PENDING
+                    mensaje_log = f"OK {dt.now().strftime('%H:%M')}"
+
+                    if ahora > hora_limite:
+                        estatus = OrderStatus.LATE
+                        mensaje_log = f"LATE ({hora_limite_str})"
+
+                    # Registrar en DB local
+                    add_to_buffer(sku_id, cantidad, nombre_local, proveedor_id=prov_id)
+
+                    # Feedback al local sheet
+                    acumulado = _obtener_acumulado_de_db(sku_id, nombre_local)
+                    actualizaciones = [
+                        {"range": f"C{indice}", "values": [[""]]},
+                        {"range": f"D{indice}", "values": [[acumulado]]},
+                        {"range": f"E{indice}", "values": [[False]]},
+                        {"range": f"F{indice}", "values": [[mensaje_log]]},
                     ]
-                    ws_pedidos.batch_update(updates)
-                    
-                except Exception as row_error:
-                    print(f"      Err en fila {index}: {row_error}")
-                    
-        except Exception as local_error:
-            print(f"   ERROR CRITICO en local {local_name}: {local_error}")
+                    ws_pedidos.batch_update(actualizaciones)
+
+                except Exception as error_fila:
+                    logger.warning("Error en fila %d: %s", indice, error_fila)
+
+        except Exception as error_local:
+            logger.error("Error crítico en local %s: %s", nombre_local, error_local)
 
     # 3. Procesar conciliación distribuida
     process_reception_feedback()
 
-    # 4. Sincronizar Data Warehouse
-    sync_to_warehouse()
+    # 4. Sincronizar data warehouse (solo si está habilitado en .env)
+    if os.getenv("WAREHOUSE_SYNC_ENABLED", "false").lower() == "true":
+        from warehouse_sync import sync_to_warehouse
+        sync_to_warehouse()
+    else:
+        logger.info("Warehouse sync desactivado (WAREHOUSE_SYNC_ENABLED=false).")
 
-    print("\n--- Ciclo SAI Multi-Local Finalizado ---")
+    logger.info("Ciclo SAI Multi-Local finalizado.")
+
 
 if __name__ == "__main__":
+    configurar_logging()
     run_orchestrator()

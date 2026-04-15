@@ -1,106 +1,157 @@
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-from core.db_handler import Session, OrderHistory, update_history_fulfillment, OrderBuffer
-from datetime import datetime
+"""
+core/reception.py — Sincronización de pestañas RECEPCION y procesamiento
+de feedback de locales hacia la base de datos central.
+"""
+import logging
+import os
 
-def sync_reception_tab():
+from dotenv import load_dotenv
+
+from core.auth import obtener_cliente_gsheets
+from core.db_handler import OrderHistory, Session, update_history_fulfillment
+
+load_dotenv()
+
+logger = logging.getLogger(__name__)
+
+PREFIJO_LOCAL = os.getenv("LOCAL_PREFIX", "SAI_Local_")
+
+
+def sync_reception_tab() -> None:
     """Distribuye los registros SENT del historial a las pestañas RECEPCION de cada local."""
-    print("--- Sincronizando Pestañas RECEPCION (Distribuidas) ---")
-    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
-    client = gspread.authorize(creds)
-    
-    # Discovery de Locales
-    all_files = client.list_spreadsheet_files()
-    local_files = [f for f in all_files if f['name'].startswith("SAI_Local_")]
-    
+    logger.info("Sincronizando pestañas RECEPCION (distribuidas)...")
+    cliente = obtener_cliente_gsheets()
+
+    # Discovery de locales
+    todos_los_archivos = cliente.list_spreadsheet_files()
+    archivos_locales = [f for f in todos_los_archivos if f["name"].startswith(PREFIJO_LOCAL)]
+
     session = Session()
     try:
-        # Traer todos los SENT del historial
-        sent_history = session.query(OrderHistory).filter(OrderHistory.fulfillment_status == 'SENT').all()
-        
-        for entry in local_files:
-            local_name = entry['name']
-            local_id = entry['id']
-            
-            # Filtrar registros que pertenecen a este local
-            local_orders = [h for h in sent_history if h.centro_costo == local_name]
-            
-            if not local_orders:
+        historial_enviado = (
+            session.query(OrderHistory)
+            .filter(OrderHistory.fulfillment_status == "SENT")
+            .all()
+        )
+
+        for entrada in archivos_locales:
+            nombre_local = entrada["name"]
+            id_local = entrada["id"]
+
+            pedidos_local = [h for h in historial_enviado if h.centro_costo == nombre_local]
+
+            if not pedidos_local:
                 continue
-                
-            print(f"   Inyectando {len(local_orders)} pedidos en {local_name}...")
-            
+
+            logger.info("Inyectando %d pedidos en %s...", len(pedidos_local), nombre_local)
+
             try:
-                sh = client.open_by_key(local_id)
+                sh = cliente.open_by_key(id_local)
                 ws = sh.worksheet("RECEPCION")
-                
-                # Encabezados (ID_Hist, SKU, Prod, Cant_Ped, Cant_Rec, Estado, Notas)
-                headers = ["ID_HISTORIAL", "SKU_ID", "Producto", "Cant_Pedida", "Cant_Recibida", "Estado_Articulo", "Notas"]
+
+                # Col H = "Procesado" (vacío al inyectar = pendiente de procesar)
+                encabezados = [
+                    "ID_HISTORIAL", "SKU_ID", "Producto",
+                    "Cant_Pedida", "Cant_Recibida", "Estado_Articulo", "Notas", "Procesado",
+                ]
                 ws.clear()
-                ws.append_row(headers)
-                
-                rows = []
-                for h in local_orders:
-                    rows.append([
-                        h.id, h.sku_id, "", h.cantidad, h.cantidad, "OK", ""
-                    ])
-                
-                ws.append_rows(rows)
-                ws.format('A1:G1', {'textFormat': {'bold': True}, 'backgroundColor': {'red': 0.1, 'green': 0.5, 'blue': 0.1}})
-                
-            except Exception as e:
-                print(f"      ERROR en {local_name}: {e}")
-                
-        print("OK: Sincronización descentralizada completa.")
+                ws.append_row(encabezados)
+
+                filas = [
+                    [h.id, h.sku_id, "", h.cantidad, h.cantidad, "OK", "", ""]
+                    for h in pedidos_local
+                ]
+                ws.append_rows(filas)
+                ws.format(
+                    "A1:H1",
+                    {
+                        "textFormat": {"bold": True},
+                        "backgroundColor": {"red": 0.1, "green": 0.5, "blue": 0.1},
+                    },
+                )
+
+            except Exception as error:
+                logger.error("Error en %s: %s", nombre_local, error)
+
+        logger.info("Sincronización descentralizada completada.")
     finally:
         session.close()
 
-def process_reception_feedback():
-    """Recolecta el feedback de RECEPCION desde cada local y actualiza la base de datos central."""
-    print("--- Procesando Feedback de Recepción (Multi-Local) ---")
-    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
-    client = gspread.authorize(creds)
-    
-    all_files = client.list_spreadsheet_files()
-    local_files = [f for f in all_files if f['name'].startswith("SAI_Local_")]
-    
-    for entry in local_files:
-        local_name = entry['name']
-        try:
-            sh = client.open_by_key(entry['id'])
-            ws = sh.worksheet("RECEPCION")
-            data = ws.get_all_records()
-            
-            if not data: continue
-            
-            for row in data:
-                h_id = row['ID_HISTORIAL']
-                # Validar que sea un registro procesable
-                if not h_id or str(h_id).strip() == "": continue
-                
-                cant_pedida = float(row['Cant_Pedida'])
-                cant_rec = float(row['Cant_Recibida'])
-                estado = str(row['Estado_Articulo']).upper()
-                notas = row['Notas']
-                
-                status = "COMPLETE"
-                if estado == "CANCELADO" or estado == "RECHAZADO":
-                    status = "CANCELLED"
-                elif cant_rec < cant_pedida:
-                    status = "PARTIAL"
-                
-                success = update_history_fulfillment(h_id, cant_rec, status, f"[{estado}] {notas}")
-                if success:
-                    # Limpiar la fila del local o marcarla como procesada
-                    # Como Senior Engineer, por ahora lo dejamos registrado para el siguiente sync total
-                    pass
 
-            print(f"   Feedback procesado para {local_name}.")
-            
-        except Exception as e:
-            print(f"   ERROR leyendo feedback de {local_name}: {e}")
+def process_reception_feedback() -> None:
+    """Recolecta el feedback de RECEPCION desde cada local y actualiza la base de datos central.
+
+    Las filas con columna 'Procesado' == 'SI' se saltan para evitar reprocesamiento.
+    Cuando una fila se procesa con éxito, se escribe 'SI' en la columna H.
+    """
+    logger.info("Procesando feedback de recepción (multi-local)...")
+    cliente = obtener_cliente_gsheets()
+
+    todos_los_archivos = cliente.list_spreadsheet_files()
+    archivos_locales = [f for f in todos_los_archivos if f["name"].startswith(PREFIJO_LOCAL)]
+
+    for entrada in archivos_locales:
+        nombre_local = entrada["name"]
+        try:
+            sh = cliente.open_by_key(entrada["id"])
+            ws = sh.worksheet("RECEPCION")
+            datos = ws.get_all_records()
+
+            if not datos:
+                continue
+
+            filas_procesadas = 0
+
+            # start=2: fila 1 = encabezados, filas de datos comienzan en fila 2
+            for indice_fila, fila in enumerate(datos, start=2):
+                # Saltar filas ya procesadas en ciclos anteriores
+                procesado = str(fila.get("Procesado", "")).strip().upper()
+                if procesado == "SI":
+                    continue
+
+                id_historial = fila.get("ID_HISTORIAL")
+                if not id_historial or str(id_historial).strip() == "":
+                    continue
+
+                try:
+                    cant_pedida = float(fila["Cant_Pedida"])
+                    cant_recibida = float(fila["Cant_Recibida"])
+                    estado = str(fila["Estado_Articulo"]).upper()
+                    notas = fila.get("Notas", "")
+
+                    if estado in ("CANCELADO", "RECHAZADO"):
+                        estatus = "CANCELLED"
+                    elif cant_recibida < cant_pedida:
+                        estatus = "PARTIAL"
+                    else:
+                        estatus = "COMPLETE"
+
+                    exito = update_history_fulfillment(
+                        id_historial, cant_recibida, estatus, f"[{estado}] {notas}"
+                    )
+
+                    if exito:
+                        # Marcar fila como procesada en columna H para evitar reprocesamiento
+                        ws.update_cell(indice_fila, 8, "SI")
+                        filas_procesadas += 1
+                        logger.info(
+                            "Fila %d marcada como procesada (ID_HISTORIAL: %s).",
+                            indice_fila, id_historial,
+                        )
+
+                except (ValueError, KeyError) as error_fila:
+                    logger.warning(
+                        "Error en fila %d de %s: %s", indice_fila, nombre_local, error_fila
+                    )
+
+            logger.info(
+                "Feedback procesado para %s: %d filas nuevas.",
+                nombre_local, filas_procesadas,
+            )
+
+        except Exception as error:
+            logger.error("Error leyendo feedback de %s: %s", nombre_local, error)
+
 
 if __name__ == "__main__":
     sync_reception_tab()

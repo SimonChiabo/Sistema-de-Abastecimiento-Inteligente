@@ -1,11 +1,22 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Enum
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from datetime import datetime
 import enum
+import logging
+import os
+from datetime import datetime
 
-Base = declarative_base()
-DB_URL = "sqlite:///sai_local.db"
+from dotenv import load_dotenv
+from sqlalchemy import Column, DateTime, Enum, Float, Integer, String, create_engine
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
+
+load_dotenv()
+
+logger = logging.getLogger(__name__)
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+DB_URL = os.getenv("DB_URL", "sqlite:///sai_local.db")
 engine = create_engine(DB_URL)
 Session = sessionmaker(bind=engine)
 
@@ -81,22 +92,25 @@ def add_to_buffer(sku_id, cantidad, centro_costo, proveedor_id=None, fecha_despa
 
         if existing_order:
             existing_order.cantidad += cantidad
-            print(f"DEBUG: Consolidando {cantidad} a SKU {sku_id} en {centro_costo}. Nueva cant: {existing_order.cantidad}")
+            logger.debug(
+                "Consolidando %.2f a SKU %s en %s. Nueva cantidad: %.2f",
+                cantidad, sku_id, centro_costo, existing_order.cantidad,
+            )
         else:
             new_order = OrderBuffer(
                 sku_id=sku_id,
                 cantidad=cantidad,
                 centro_costo=centro_costo,
                 proveedor_id=proveedor_id,
-                fecha_despacho_esperada=fecha_despacho
+                fecha_despacho_esperada=fecha_despacho,
             )
             session.add(new_order)
-            print(f"DEBUG: Nuevo registro en buffer para SKU {sku_id} en {centro_costo}.")
+            logger.debug("Nuevo registro en buffer para SKU %s en %s.", sku_id, centro_costo)
 
         session.commit()
     except Exception as e:
         session.rollback()
-        print(f"ERROR en db_handler.add_to_buffer: {e}")
+        logger.error("Error en add_to_buffer: %s", e)
     finally:
         session.close()
 
@@ -130,10 +144,13 @@ def archive_orders(provider_id, file_path, sku_prices=None):
             session.delete(order)
         
         session.commit()
-        print(f"ARCHIVE: {len(sent_orders)} registros movidos al historial para {provider_id}.")
+        logger.info(
+            "ARCHIVE: %d registros movidos al historial para %s.",
+            len(sent_orders), provider_id,
+        )
     except Exception as e:
         session.rollback()
-        print(f"ERROR en archiving: {e}")
+        logger.error("Error en archive_orders: %s", e)
     finally:
         session.close()
 
@@ -150,13 +167,14 @@ def update_history_fulfillment(history_id, received_qty, status, notes=None):
             return True
     except Exception as e:
         session.rollback()
-        print(f"ERROR actualizando historia: {e}")
+        logger.error("Error actualizando historial ID %s: %s", history_id, e)
     finally:
         session.close()
     return False
 
 if __name__ == "__main__":
-    # Prueba rápida de inicialización y lógica
-    print("Iniciando prueba de db_handler...")
+    from core.log_config import configurar_logging
+    configurar_logging()
+    logger.info("Iniciando prueba de db_handler...")
     add_to_buffer("SKU-TEST-01", 10.0, "LOCAL_01")
     add_to_buffer("SKU-TEST-01", 5.0, "LOCAL_01")

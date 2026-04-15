@@ -1,44 +1,59 @@
-from analytics_export import export_to_csv
-from core.notifier import send_audit_report
-from core.db_handler import Session, OrderHistory
+"""
+audit_job.py — Job de auditoría productiva.
+Exporta el historial a CSV, calcula métricas y envía el reporte por email.
+"""
+import logging
 from datetime import datetime
 
-def calculate_metrics():
+from analytics_export import export_to_csv
+from core.db_handler import OrderHistory, Session
+from core.log_config import configurar_logging
+from core.notifier import send_audit_report
+
+logger = logging.getLogger(__name__)
+
+
+def _calcular_metricas() -> dict:
     """Calcula las métricas clave del historial para el resumen del correo."""
     session = Session()
     try:
-        data = session.query(OrderHistory).all()
-        total_orders = len(data)
-        total_amount = sum(h.total_linea for h in data)
-        pending_conciliation = len([h for h in data if h.fulfillment_status == 'SENT'])
-        
+        datos = session.query(OrderHistory).all()
+        total_ordenes = len(datos)
+        monto_total = sum(h.total_linea for h in datos if h.total_linea)
+        pendientes_conciliacion = len(
+            [h for h in datos if h.fulfillment_status == "SENT"]
+        )
         return {
-            'total_orders': total_orders,
-            'total_amount': total_amount,
-            'pending_conciliation': pending_conciliation
+            "total_orders": total_ordenes,
+            "total_amount": monto_total,
+            "pending_conciliation": pendientes_conciliacion,
         }
     finally:
         session.close()
 
-def run_production_audit():
-    print(f"--- Iniciando Proceso Productivo de Auditoría: {datetime.now()} ---")
-    
-    filename = "SAI_Analitica_Global.csv"
-    
+
+def run_production_audit() -> None:
+    """Ejecuta el ciclo completo de auditoría: exportar → calcular → notificar."""
+    logger.info("Iniciando proceso productivo de auditoría: %s", datetime.now())
+
+    nombre_archivo = "SAI_Analitica_Global.csv"
+
     # 1. Exportar datos a CSV
-    count = export_to_csv(filename)
-    
-    if count > 0:
-        # 2. Calcular Métricas para el resumen ejecutivo
-        metrics = calculate_metrics()
-        
+    cantidad = export_to_csv(nombre_archivo)
+
+    if cantidad > 0:
+        # 2. Calcular métricas para el resumen ejecutivo
+        metricas = _calcular_metricas()
+
         # 3. Enviar correo con reporte y métricas
-        success = send_audit_report(filename, metrics)
-        
-        if success:
-            print("EJECUCIÓN PRODUCTIVA EXITOSA: Todo en orden.")
+        exito = send_audit_report(nombre_archivo, metricas)
+
+        if exito:
+            logger.info("Ejecución productiva exitosa. Todo en orden.")
     else:
-        print("No se registran datos en el historial para procesar.")
+        logger.warning("No se registran datos en el historial para procesar.")
+
 
 if __name__ == "__main__":
+    configurar_logging()
     run_production_audit()

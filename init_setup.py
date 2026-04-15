@@ -1,96 +1,90 @@
+"""
+init_setup.py — Configuración inicial de la infraestructura SAI en el spreadsheet maestro.
+Crea las pestañas MASTER_SKU y MASTER_PROV con sus encabezados si no existen.
+"""
+import logging
+
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-import time
 
-def setup_sai_infrastructure():
-    print("--- Configurando Infraestructura SAI en Spreadsheet existente ---")
-    
-    # Configuración de autenticación
-    scope = [
-        "https://spreadsheets.google.com/feeds",
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive.file",
-        "https://www.googleapis.com/auth/drive"
-    ]
-    
-    try:
-        creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
-        client = gspread.authorize(creds)
-        print("OK: Autenticación exitosa.")
-    except Exception as e:
-        print(f"ERROR: Autenticación: {e}")
-        return
+from core.auth import obtener_spreadsheet_maestro
+from core.log_config import configurar_logging
 
-    # 1. Abrir el Spreadsheet (debe estar compartido con el bot)
-    spreadsheet_name = "SAI - Sistema de Abastecimiento"
+logger = logging.getLogger(__name__)
+
+
+def setup_sai_infrastructure() -> None:
+    """Crea o limpia las pestañas maestras en el spreadsheet central de SAI."""
+    logger.info("Configurando infraestructura SAI en spreadsheet existente...")
+
     try:
-        print(f"Abriendo Spreadsheet: {spreadsheet_name}...")
-        sh = client.open(spreadsheet_name)
-        print(f"OK: Spreadsheet encontrado con ID: {sh.id}")
+        sh = obtener_spreadsheet_maestro()
+        logger.info("Spreadsheet maestro encontrado. ID: %s", sh.id)
     except gspread.SpreadsheetNotFound:
-        print(f"ERROR: No se encontró el archivo '{spreadsheet_name}'.")
-        print("Asegúrate de haberlo compartido con el bot y que el nombre sea EXACTO.")
+        logger.error(
+            "Spreadsheet maestro no encontrado. "
+            "Asegúrate de haberlo compartido con la cuenta de servicio "
+            "y que el nombre en MASTER_SPREADSHEET_NAME sea exacto."
+        )
         return
-    except Exception as e:
-        print(f"ERROR al abrir: {e}")
+    except Exception as error:
+        logger.error("Error al abrir spreadsheet maestro: %s", error)
         return
 
-    # 2. Configurar pestañas y encabezados
-    sheets_config = {
+    # Configuración de pestañas y encabezados
+    config_hojas = {
         "MASTER_SKU": ["SKU_ID", "Nombre", "Categoría", "Presentación", "Proveedor_ID", "Precio_Ref"],
-        "MASTER_PROV": ["Proveedor_ID", "Nombre", "Email", "Frecuencia", "Hora_Limite", "Dias_Programados"]
+        "MASTER_PROV": ["Proveedor_ID", "Nombre", "Email", "Frecuencia", "Hora_Limite", "Dias_Programados"],
     }
 
-    # Obtener lista de pestañas existentes para no duplicar si hay errores
-    existing_worksheets = [ws.title for ws in sh.worksheets()]
+    hojas_existentes = [ws.title for ws in sh.worksheets()]
 
-    for sheet_name, headers in sheets_config.items():
-        print(f"Configurando pestaña: {sheet_name}...")
+    for nombre_hoja, encabezados in config_hojas.items():
+        logger.info("Configurando pestaña: %s...", nombre_hoja)
         try:
-            if sheet_name in existing_worksheets:
-                worksheet = sh.worksheet(sheet_name)
-                print(f"   Pestaña ya existe. Limpiando...")
+            if nombre_hoja in hojas_existentes:
+                worksheet = sh.worksheet(nombre_hoja)
+                logger.info("  Pestaña ya existe. Limpiando...")
                 worksheet.clear()
             else:
-                # Si es la primera y no se llama MASTER_SKU, renombramos la default (Hoja 1 o Sheet1)
-                if sheet_name == "MASTER_SKU" and len(existing_worksheets) == 1:
+                # Si es la primera pestaña, renombrar la default en lugar de añadir
+                if nombre_hoja == "MASTER_SKU" and len(hojas_existentes) == 1:
                     worksheet = sh.get_worksheet(0)
-                    worksheet.update_title(sheet_name)
+                    worksheet.update_title(nombre_hoja)
                     worksheet.clear()
                 else:
-                    worksheet = sh.add_worksheet(title=sheet_name, rows="100", cols="20")
-            
-            # Insertar encabezados
-            worksheet.append_row(headers)
-            
-            # Formatear encabezados (Negrita y fondo gris claro)
-            worksheet.format('A1:Z1', {
-                'textFormat': {'bold': True},
-                'backgroundColor': {'red': 0.9, 'green': 0.9, 'blue': 0.9},
-                'horizontalAlignment': 'CENTER'
-            })
-            
-            # Ajustar anchos opcionalmente si gspread lo permite de forma fácil
-            # (En el futuro podemos usar batch_update para esto)
-            
-            print(f"   Done.")
-        except Exception as e:
-            print(f"   ERROR en {sheet_name}: {e}")
+                    worksheet = sh.add_worksheet(title=nombre_hoja, rows="100", cols="20")
 
-    # 3. Eliminar "Hoja 1" o "Sheet1" si quedó colgada
+            worksheet.append_row(encabezados)
+            worksheet.format(
+                "A1:Z1",
+                {
+                    "textFormat": {"bold": True},
+                    "backgroundColor": {"red": 0.9, "green": 0.9, "blue": 0.9},
+                    "horizontalAlignment": "CENTER",
+                },
+            )
+            logger.info("  Pestaña '%s' lista.", nombre_hoja)
+
+        except Exception as error:
+            logger.error("Error en pestaña '%s': %s", nombre_hoja, error)
+
+    # Eliminar hojas default sobrantes
     try:
-        if "Hoja 1" in [ws.title for ws in sh.worksheets()] and "MASTER_SKU" in [ws.title for ws in sh.worksheets()]:
-            sh.del_worksheet(sh.worksheet("Hoja 1"))
-        if "Sheet1" in [ws.title for ws in sh.worksheets()] and "MASTER_SKU" in [ws.title for ws in sh.worksheets()]:
-            sh.del_worksheet(sh.worksheet("Sheet1"))
-    except:
+        titulos_actuales = [ws.title for ws in sh.worksheets()]
+        for nombre_default in ["Hoja 1", "Sheet1", "Hoja1"]:
+            if nombre_default in titulos_actuales and "MASTER_SKU" in titulos_actuales:
+                sh.del_worksheet(sh.worksheet(nombre_default))
+                logger.info("Hoja default '%s' eliminada.", nombre_default)
+    except Exception:
         pass
 
-    print("\n" + "="*40)
-    print(f"INFRAESTRUCTURA DESPLEGADA EXITOSAMENTE")
-    print(f"ID del Spreadsheet: {sh.id}")
-    print(f"URL: https://docs.google.com/spreadsheets/d/{sh.id}")
-    print("="*40)
+    logger.info(
+        "Infraestructura desplegada exitosamente. "
+        "URL: https://docs.google.com/spreadsheets/d/%s",
+        sh.id,
+    )
+
 
 if __name__ == "__main__":
+    configurar_logging()
     setup_sai_infrastructure()

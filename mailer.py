@@ -1,60 +1,23 @@
-import os
+"""
+mailer.py — Orquestador de despacho SAI v2.0.
+Consolida pedidos pendientes por proveedor, genera OCs HTML y las archiva.
+"""
 import json
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+import logging
+import os
 from datetime import datetime
+
+from dotenv import load_dotenv
 from jinja2 import Template
-from core.db_handler import Session, OrderBuffer, OrderStatus, archive_orders
+
+from core.auth import obtener_cliente_gsheets, obtener_spreadsheet_maestro
+from core.db_handler import OrderBuffer, OrderStatus, Session, archive_orders
+from core.log_config import configurar_logging
 from core.reception import sync_reception_tab
 
-def get_masters_data():
-    """Obtiene los datos maestros de Google Sheets."""
-    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
-    client = gspread.authorize(creds)
-    sh = client.open("SAI - Sistema de Abastecimiento")
-    
-    sku_records = sh.worksheet("MASTER_SKU").get_all_records()
-    prov_records = sh.worksheet("MASTER_PROV").get_all_records()
-    
-    sku_map = {str(r['SKU_ID']).strip(): r for r in sku_records}
-    prov_map = {str(r['Proveedor_ID']).strip(): r for r in prov_records}
-    
-    return sku_map, prov_map
+load_dotenv()
 
-def should_process_provider(prov_data):
-    """
-    Determina si un proveedor debe procesarse hoy según su frecuencia y hora de corte.
-    Como Lead SE, implementamos validación estricta de calendario.
-    """
-    frecuencia = str(prov_data.get('Frecuencia', 'DIARIO')).upper()
-    now = datetime.now()
-    
-    # 1. Validación de Día (Calendario)
-    if frecuencia == 'PROGRAMADO':
-        dias_str = str(prov_data.get('Dias_Programados', '[]'))
-        try:
-            dias_programados = json.loads(dias_str)
-            if now.weekday() not in dias_programados:
-                return False
-        except:
-            return False
-            
-    # 2. Validación de Hora Límite (Disparo de Envío)
-    # Solo "disparamos" si ya pasamos la hora límite del proveedor (consolidación diaria)
-    hora_limite_str = str(prov_data.get('Hora_Limite', '20:00')).strip()
-    try:
-        current_time = now.time()
-        limit_time = datetime.strptime(hora_limite_str, "%H:%M").time()
-        # Nota: En un sistema industrial, aquí decidiríamos si enviar justo a esa hora.
-        # Por ahora, permitimos el envío si ya es hora o posterior.
-        if current_time < limit_time:
-            # Todavía hay tiempo para recibir más pedidos antes del envío total
-            return False
-    except:
-        pass
-
-    return True
+logger = logging.getLogger(__name__)
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -77,7 +40,7 @@ HTML_TEMPLATE = """
         <h2>Orden de Compra - SAI</h2>
         <p>Proveedor: {{ prov_nombre }} | Fecha Despacho: {{ fecha }}</p>
     </div>
-    
+
     <table>
         <thead>
             <tr>
@@ -104,7 +67,7 @@ HTML_TEMPLATE = """
             </tr>
         </tbody>
     </table>
-    
+
     <div class="footer">
         <p>Este pedido consolida todos los requerimientos pendientes hasta la hora de corte.</p>
         <p>Identificador de Transacción: {{ trx_id }}</p>
@@ -113,122 +76,173 @@ HTML_TEMPLATE = """
 </html>
 """
 
-def run_mailer():
-    print(f"--- Orquestador de Despacho SAI v2.0: {datetime.now().strftime('%H:%M')} ---")
-    
+
+def _obtener_datos_maestros() -> tuple[dict, dict]:
+    """Obtiene los datos maestros de Google Sheets."""
+    sh = obtener_spreadsheet_maestro()
+
+    registros_sku = sh.worksheet("MASTER_SKU").get_all_records()
+    registros_prov = sh.worksheet("MASTER_PROV").get_all_records()
+
+    mapa_sku = {str(r["SKU_ID"]).strip(): r for r in registros_sku}
+    mapa_prov = {str(r["Proveedor_ID"]).strip(): r for r in registros_prov}
+
+    return mapa_sku, mapa_prov
+
+
+def _debe_procesar_proveedor(datos_prov: dict) -> bool:
+    """
+    Determina si un proveedor debe procesarse hoy según su frecuencia y hora de corte.
+    """
+    frecuencia = str(datos_prov.get("Frecuencia", "DIARIO")).upper()
+    ahora = datetime.now()
+
+    # 1. Validación de día (calendario)
+    if frecuencia == "PROGRAMADO":
+        dias_str = str(datos_prov.get("Dias_Programados", "[]"))
+        try:
+            dias_programados = json.loads(dias_str)
+            if ahora.weekday() not in dias_programados:
+                return False
+        except (json.JSONDecodeError, ValueError):
+            return False
+
+    # 2. Validación de hora límite
+    hora_limite_str = str(datos_prov.get("Hora_Limite", "20:00")).strip()
     try:
-        sku_map, prov_map = get_masters_data()
-    except Exception as e:
-        print(f"ERROR MASTER: {e}")
+        hora_actual = ahora.time()
+        hora_limite = datetime.strptime(hora_limite_str, "%H:%M").time()
+        if hora_actual < hora_limite:
+            return False
+    except ValueError:
+        pass
+
+    return True
+
+
+def run_mailer() -> None:
+    """Orquesta la consolidación de pedidos y generación de órdenes de compra HTML."""
+    logger.info("Orquestador de despacho SAI v2.0: %s", datetime.now().strftime("%H:%M"))
+
+    try:
+        mapa_sku, mapa_prov = _obtener_datos_maestros()
+    except Exception as error:
+        logger.error("Error al obtener maestros: %s", error)
         return
 
     session = Session()
     try:
-        pending_orders = session.query(OrderBuffer).filter(
-            OrderBuffer.status == OrderStatus.PENDING
-        ).all()
-        
-        if not pending_orders:
-            print("No hay pedidos pendientes en buffer.")
+        pedidos_pendientes = (
+            session.query(OrderBuffer)
+            .filter(OrderBuffer.status == OrderStatus.PENDING)
+            .all()
+        )
+
+        if not pedidos_pendientes:
+            logger.info("No hay pedidos pendientes en buffer.")
             return
 
-        # --- FASE 1: CONSOLIDACIÓN POR PROVEEDOR Y SKU ---
-        # Estructura: consolidate_map[prov_id][sku_id] = {info, total_qty, db_orders_refs}
-        consolidate_map = {}
-        
-        for order in pending_orders:
-            prov_id = order.proveedor_id
-            if not prov_id or prov_id not in prov_map:
-                continue
-            
-            # Filtro de Calendario y Hora de Corte
-            if not should_process_provider(prov_map[prov_id]):
-                continue
-            
-            if prov_id not in consolidate_map:
-                consolidate_map[prov_id] = {}
-            
-            sku_id = order.sku_id
-            if sku_id not in consolidate_map[prov_id]:
-                # Obtener info maestra
-                p_info = sku_map.get(sku_id, {})
-                
-                # Gestión de Precios
-                p_raw = p_info.get('Precio_Ref', 0)
-                try: p_unit = float(str(p_raw).replace('$', '').replace(',', '').strip())
-                except: p_unit = 0.0
+        # --- FASE 1: Consolidación por proveedor y SKU ---
+        mapa_consolidado: dict = {}
 
-                consolidate_map[prov_id][sku_id] = {
-                    'nombre': p_info.get('Nombre', 'N/A'),
-                    'presentacion': p_info.get('Presentación', 'N/A'),
-                    'cantidad': 0.0,
-                    'precio_unit': p_unit,
-                    'db_refs': []
+        for pedido in pedidos_pendientes:
+            prov_id = pedido.proveedor_id
+            if not prov_id or prov_id not in mapa_prov:
+                continue
+
+            if not _debe_procesar_proveedor(mapa_prov[prov_id]):
+                continue
+
+            if prov_id not in mapa_consolidado:
+                mapa_consolidado[prov_id] = {}
+
+            sku_id = pedido.sku_id
+            if sku_id not in mapa_consolidado[prov_id]:
+                info_sku = mapa_sku.get(sku_id, {})
+
+                precio_raw = info_sku.get("Precio_Ref", 0)
+                try:
+                    precio_unit = float(
+                        str(precio_raw).replace("$", "").replace(",", "").strip()
+                    )
+                except (ValueError, TypeError):
+                    precio_unit = 0.0
+
+                mapa_consolidado[prov_id][sku_id] = {
+                    "nombre": info_sku.get("Nombre", "N/A"),
+                    "presentacion": info_sku.get("Presentación", "N/A"),
+                    "cantidad": 0.0,
+                    "precio_unit": precio_unit,
+                    "db_refs": [],
                 }
-            
-            # Sumatoria (Consolidación)
-            consolidate_map[prov_id][sku_id]['cantidad'] += order.cantidad
-            consolidate_map[prov_id][sku_id]['db_refs'].append(order)
 
-        # --- FASE 2: GENERACIÓN DE OCs ---
-        if not os.path.exists('outbox'): os.makedirs('outbox')
+            mapa_consolidado[prov_id][sku_id]["cantidad"] += pedido.cantidad
+            mapa_consolidado[prov_id][sku_id]["db_refs"].append(pedido)
+
+        # --- FASE 2: Generación de OCs ---
+        if not os.path.exists("outbox"):
+            os.makedirs("outbox")
+
         template = Template(HTML_TEMPLATE)
-        fecha_file = datetime.now().strftime("%Y%m%d")
-        
-        processed_count = 0
-        for prov_id, skus_data in consolidate_map.items():
-            items_for_html = []
-            total_orden = 0
-            all_db_orders = []
-            
-            for sku_id, data in skus_data.items():
-                data['subtotal'] = data['cantidad'] * data['precio_unit']
-                total_orden += data['subtotal']
-                items_for_html.append(data)
-                all_db_orders.extend(data['db_refs'])
-            
-            if not items_for_html: continue
+        fecha_archivo = datetime.now().strftime("%Y%m%d")
+        contador_procesados = 0
 
-            prov_nombre = prov_map[prov_id]['Nombre']
-            filename = f"outbox/{fecha_file}_{prov_id}_Consolidado.html"
-            
-            print(f"Despachando OC: {prov_nombre} | Items: {len(items_for_html)}")
-            
-            html_content = template.render(
-                prov_nombre=prov_nombre,
+        for prov_id, datos_skus in mapa_consolidado.items():
+            items_html = []
+            total_orden = 0.0
+            todos_los_pedidos_db = []
+
+            for sku_id, datos in datos_skus.items():
+                datos["subtotal"] = datos["cantidad"] * datos["precio_unit"]
+                total_orden += datos["subtotal"]
+                items_html.append(datos)
+                todos_los_pedidos_db.extend(datos["db_refs"])
+
+            if not items_html:
+                continue
+
+            nombre_prov = mapa_prov[prov_id]["Nombre"]
+            nombre_archivo = f"outbox/{fecha_archivo}_{prov_id}_Consolidado.html"
+
+            logger.info("Despachando OC: %s | Items: %d", nombre_prov, len(items_html))
+
+            contenido_html = template.render(
+                prov_nombre=nombre_prov,
                 fecha=datetime.now().strftime("%d/%m/%Y"),
-                items=items_for_html,
+                items=items_html,
                 total_orden=total_orden,
-                trx_id=f"SAI-{fecha_file}-{prov_id}"
+                trx_id=f"SAI-{fecha_archivo}-{prov_id}",
             )
-            
-            with open(filename, 'w', encoding='utf-8') as f:
-                f.write(html_content)
-            
-            # Marcar registros como SENT (Idempotencia)
-            for db_order in all_db_orders:
-                db_order.status = OrderStatus.SENT
-            
-            # Persistir cambio de estatus a SENT primero para poder archivarlos
-            session.commit()
-            
-            # --- Tarea DBA: Archivando pedidos ---
-            # Construimos mapa de precios para el histórico
-            sku_prices = {s_id: d['precio_unit'] for s_id, d in skus_data.items()}
-            archive_orders(prov_id, filename, sku_prices=sku_prices)
-            
-            processed_count += 1
 
-        # Actualizar la pestaña de recepción con los nuevos pedidos enviados
+            with open(nombre_archivo, "w", encoding="utf-8") as f:
+                f.write(contenido_html)
+
+            # Marcar registros como SENT
+            for pedido_db in todos_los_pedidos_db:
+                pedido_db.status = OrderStatus.SENT
+
+            session.commit()
+
+            # Archivar pedidos al historial
+            precios_sku = {s_id: d["precio_unit"] for s_id, d in datos_skus.items()}
+            archive_orders(prov_id, nombre_archivo, sku_prices=precios_sku)
+
+            contador_procesados += 1
+
+        # Actualizar pestaña de recepción con los nuevos pedidos
         sync_reception_tab()
 
-        print(f"Ciclo terminado. {processed_count} OCs generadas y archivadas.")
-        
-    except Exception as e:
+        logger.info(
+            "Ciclo terminado. %d OCs generadas y archivadas.", contador_procesados
+        )
+
+    except Exception as error:
         session.rollback()
-        print(f"CRITICAL: {e}")
+        logger.error("Error crítico en mailer: %s", error)
     finally:
         session.close()
 
+
 if __name__ == "__main__":
+    configurar_logging()
     run_mailer()

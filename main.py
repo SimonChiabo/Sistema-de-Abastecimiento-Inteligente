@@ -5,6 +5,7 @@ procesa el feedback de recepción y sincroniza el warehouse.
 """
 import logging
 import os
+import argparse
 
 from dotenv import load_dotenv
 
@@ -38,7 +39,7 @@ def _obtener_acumulado_de_db(sku_id: str, centro_costo: str) -> float:
         session.close()
 
 
-def run_orchestrator() -> None:
+def run_orchestrator(modo_manual: bool = False) -> None:
     """Ejecuta el ciclo completo SAI: lectura de pedidos → buffer → feedback → warehouse."""
     from datetime import datetime
 
@@ -84,47 +85,61 @@ def run_orchestrator() -> None:
             if len(filas) < 2:
                 continue
 
+            encabezados = filas[0]
+            actualizaciones_batch = []
+
             for indice, fila in enumerate(filas[1:], start=2):
                 try:
                     sku_id = str(fila[0]).strip()
+                    if not sku_id:
+                        continue
+
                     cantidad_str = str(fila[2]).strip()
                     confirmado = str(fila[4]).upper() == "TRUE"
 
-                    if not confirmado or not sku_id or not cantidad_str:
-                        continue
+                    # 1. Si hay un pedido nuevo, lo procesamos
+                    if confirmado and cantidad_str:
+                        logger.info("  [NUEVO PEDIDO - SKU: %s] Cantidad: %s", sku_id, cantidad_str)
+                        cantidad = float(cantidad_str.replace(",", "."))
 
-                    logger.info("  [SKU: %s] Cantidad: %s", sku_id, cantidad_str)
-                    cantidad = float(cantidad_str.replace(",", "."))
+                        # Lógica de horarios
+                        prov_id = sku_a_prov.get(sku_id)
+                        hora_limite_str = hora_limite_prov.get(prov_id, "23:59")
+                        ahora = dt.now().time()
+                        hora_limite = dt.strptime(hora_limite_str, "%H:%M").time()
 
-                    # Lógica de horarios
-                    prov_id = sku_a_prov.get(sku_id)
-                    hora_limite_str = hora_limite_prov.get(prov_id, "23:59")
+                        estatus = OrderStatus.PENDING
+                        mensaje_log = f"OK {dt.now().strftime('%H:%M')}"
 
-                    ahora = dt.now().time()
-                    hora_limite = dt.strptime(hora_limite_str, "%H:%M").time()
+                        if not modo_manual and ahora > hora_limite:
+                            estatus = OrderStatus.LATE
+                            mensaje_log = f"LATE ({hora_limite_str})"
 
-                    estatus = OrderStatus.PENDING
-                    mensaje_log = f"OK {dt.now().strftime('%H:%M')}"
+                        if modo_manual:
+                            mensaje_log = f"MANUAL {dt.now().strftime('%H:%M')}"
 
-                    if ahora > hora_limite:
-                        estatus = OrderStatus.LATE
-                        mensaje_log = f"LATE ({hora_limite_str})"
+                        # Registrar en DB local
+                        add_to_buffer(sku_id, cantidad, nombre_local, proveedor_id=prov_id, status=estatus)
+                        
+                        # Preparar limpieza de fila de entrada
+                        actualizaciones_batch.append({"range": f"C{indice}", "values": [[""]]})
+                        actualizaciones_batch.append({"range": f"E{indice}", "values": [[False]]})
+                        actualizaciones_batch.append({"range": f"F{indice}", "values": [[mensaje_log]]})
 
-                    # Registrar en DB local
-                    add_to_buffer(sku_id, cantidad, nombre_local, proveedor_id=prov_id)
+                    # 2. SIEMPRE actualizamos el acumulado (Columna D) para reflejar la realidad de la DB
+                    acumulado_real = _obtener_acumulado_de_db(sku_id, nombre_local)
+                    actualizaciones_batch.append({"range": f"D{indice}", "values": [[acumulado_real if acumulado_real > 0 else ""]]})
 
-                    # Feedback al local sheet
-                    acumulado = _obtener_acumulado_de_db(sku_id, nombre_local)
-                    actualizaciones = [
-                        {"range": f"C{indice}", "values": [[""]]},
-                        {"range": f"D{indice}", "values": [[acumulado]]},
-                        {"range": f"E{indice}", "values": [[False]]},
-                        {"range": f"F{indice}", "values": [[mensaje_log]]},
-                    ]
-                    ws_pedidos.batch_update(actualizaciones)
+                    # 3. Si no hay nada acumulado, limpiamos también el LOG para resetear la UI
+                    if acumulado_real == 0:
+                        actualizaciones_batch.append({"range": f"F{indice}", "values": [[""]]})
 
                 except Exception as error_fila:
                     logger.warning("Error en fila %d: %s", indice, error_fila)
+
+            # Ejecutar todas las actualizaciones de este local en un solo viaje
+            if actualizaciones_batch:
+                ws_pedidos.batch_update(actualizaciones_batch)
 
         except Exception as error_local:
             logger.error("Error crítico en local %s: %s", nombre_local, error_local)
@@ -143,5 +158,13 @@ def run_orchestrator() -> None:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Orquestador SAI Multi-Local")
+    parser.add_argument(
+        "--manual", 
+        action="store_true", 
+        help="Levanta los pedidos ignorando la restricción de horario (Modo Demo)"
+    )
+    args = parser.parse_args()
+
     configurar_logging()
-    run_orchestrator()
+    run_orchestrator(modo_manual=args.manual)

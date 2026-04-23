@@ -77,7 +77,7 @@ class MasterSku(Base):
 # Inicializar Base de Datos
 Base.metadata.create_all(engine)
 
-def add_to_buffer(sku_id, cantidad, centro_costo, proveedor_id=None, fecha_despacho=None):
+def add_to_buffer(sku_id, cantidad, centro_costo, proveedor_id=None, fecha_despacho=None, status=OrderStatus.PENDING):
     """
     Agrega un pedido al buffer. Si ya existe uno PENDING para el mismo SKU y Centro de Costo,
     se acumula la cantidad.
@@ -103,6 +103,7 @@ def add_to_buffer(sku_id, cantidad, centro_costo, proveedor_id=None, fecha_despa
                 centro_costo=centro_costo,
                 proveedor_id=proveedor_id,
                 fecha_despacho_esperada=fecha_despacho,
+                status=status
             )
             session.add(new_order)
             logger.debug("Nuevo registro en buffer para SKU %s en %s.", sku_id, centro_costo)

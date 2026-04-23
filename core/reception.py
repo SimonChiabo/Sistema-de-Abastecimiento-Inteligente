@@ -58,7 +58,7 @@ def sync_reception_tab() -> None:
                 ws.append_row(encabezados)
 
                 filas = [
-                    [h.id, h.sku_id, "", h.cantidad, h.cantidad, "OK", "", ""]
+                    [h.id, h.sku_id, "", h.cantidad, "", "", "", ""]
                     for h in pedidos_local
                 ]
                 ws.append_rows(filas)
@@ -114,9 +114,16 @@ def process_reception_feedback() -> None:
                     continue
 
                 try:
+                    raw_recibida = str(fila.get("Cant_Recibida", "")).strip()
+                    raw_estado = str(fila.get("Estado_Articulo", "")).strip().upper()
+
+                    # Si el operario no ha llenado los campos, saltamos esta fila
+                    if not raw_recibida or not raw_estado:
+                         continue
+
                     cant_pedida = float(fila["Cant_Pedida"])
-                    cant_recibida = float(fila["Cant_Recibida"])
-                    estado = str(fila["Estado_Articulo"]).upper()
+                    cant_recibida = float(raw_recibida)
+                    estado = raw_estado
                     notas = fila.get("Notas", "")
 
                     if estado in ("CANCELADO", "RECHAZADO"):

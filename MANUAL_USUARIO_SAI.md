@@ -73,5 +73,21 @@ Servir como fuente de verdad inmutable para Looker Studio y auditorías financie
 
 ---
 
+## 🛠️ Operaciones Avanzadas (Presentación / Auditoría)
+**Acceso**: CLI / Servidor
+**Perfil**: Administrador de Sistemas / Presentador
+
+### 🚀 Levantamiento Manual de Pedidos
+Para demostraciones o situaciones de emergencia donde se requiere procesar pedidos fuera del horario establecido (ignorar `LATE` status):
+
+1.  Abrir una terminal en el directorio raíz del proyecto.
+2.  Ejecutar el siguiente comando:
+    ```powershell
+    python main.py --manual
+    ```
+3.  **Efecto**: El bot procesará todos los pedidos confirmados en los locales, marcándolos como `OK` en lugar de `LATE`, permitiendo visualizar el flujo completo de abastecimiento instantáneamente.
+
+---
+
 > [!IMPORTANT]
 > **SOPORTE TÉCNICO**: Si el sistema no detecta un nuevo local, asegúrese de que el archivo del mismo comience con el prefijo `SAI_Local_` y esté compartido con `sai-bot@sai-sistema-abastecimiento.iam.gserviceaccount.com`.

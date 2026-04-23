@@ -5,6 +5,7 @@ Consolida pedidos pendientes por proveedor, genera OCs HTML y las archiva.
 import json
 import logging
 import os
+import argparse
 from datetime import datetime
 
 from dotenv import load_dotenv
@@ -120,9 +121,11 @@ def _debe_procesar_proveedor(datos_prov: dict) -> bool:
     return True
 
 
-def run_mailer() -> None:
+def run_mailer(modo_manual: bool = False) -> None:
     """Orquesta la consolidación de pedidos y generación de órdenes de compra HTML."""
     logger.info("Orquestador de despacho SAI v2.0: %s", datetime.now().strftime("%H:%M"))
+    if modo_manual:
+        logger.info("MODO MANUAL ACTIVADO: Se omitirán validaciones de horario y frecuencia.")
 
     try:
         mapa_sku, mapa_prov = _obtener_datos_maestros()
@@ -150,7 +153,7 @@ def run_mailer() -> None:
             if not prov_id or prov_id not in mapa_prov:
                 continue
 
-            if not _debe_procesar_proveedor(mapa_prov[prov_id]):
+            if not modo_manual and not _debe_procesar_proveedor(mapa_prov[prov_id]):
                 continue
 
             if prov_id not in mapa_consolidado:
@@ -244,5 +247,13 @@ def run_mailer() -> None:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Orquestador de Despacho SAI")
+    parser.add_argument(
+        "--manual", 
+        action="store_true", 
+        help="Fuerza el despacho de pedidos ignorando horarios y frecuencias (Modo Demo)"
+    )
+    args = parser.parse_args()
+
     configurar_logging()
-    run_mailer()
+    run_mailer(modo_manual=args.manual)

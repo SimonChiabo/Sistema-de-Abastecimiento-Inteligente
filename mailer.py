@@ -15,6 +15,7 @@ from core.auth import obtener_cliente_gsheets, obtener_spreadsheet_maestro
 from core.db_handler import OrderBuffer, OrderStatus, Session, archive_orders
 from core.log_config import configurar_logging
 from core.reception import sync_reception_tab
+from core.notifier import send_generic_email
 
 load_dotenv()
 
@@ -330,6 +331,17 @@ def run_mailer(modo_manual: bool = False) -> None:
 
             with open(nombre_archivo, "w", encoding="utf-8") as f:
                 f.write(contenido_html)
+
+            # Si es modo manual, enviamos una copia al administrador (Demo)
+            if modo_manual:
+                destinatario_demo = os.getenv("ADMIN_EMAIL", "simonchiabo@gmail.com")
+                logger.info("  [DEMO] Enviando copia de OC a %s...", destinatario_demo)
+                send_generic_email(
+                    subject=f"DEMO SAI: Orden de Compra - {nombre_prov}",
+                    body=contenido_html,
+                    to_email=destinatario_demo,
+                    is_html=True
+                )
 
             # Marcar registros como SENT
             for pedido_db in todos_los_pedidos_db:

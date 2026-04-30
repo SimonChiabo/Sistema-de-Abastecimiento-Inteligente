@@ -90,6 +90,36 @@ def send_audit_report(filename: str, metrics: dict) -> bool:
         logger.error("Error en el envío SMTP: %s", error)
         return False
 
+def send_generic_email(subject: str, body: str, to_email: str, is_html: bool = False) -> bool:
+    """Envía un correo electrónico genérico (texto o HTML)."""
+    servidor_smtp = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    puerto_smtp = int(os.getenv("SMTP_PORT", 587))
+    usuario_smtp = os.getenv("SMTP_USER")
+    contrasena_smtp = os.getenv("SMTP_PASS")
+
+    if not usuario_smtp or not contrasena_smtp:
+        logger.error("Credenciales SMTP no configuradas. No se puede enviar el correo.")
+        return False
+
+    msg = MIMEMultipart()
+    msg["From"] = usuario_smtp
+    msg["To"] = to_email
+    msg["Subject"] = subject
+
+    msg.attach(MIMEText(body, "html" if is_html else "plain"))
+
+    try:
+        servidor = smtplib.SMTP(servidor_smtp, puerto_smtp)
+        servidor.starttls()
+        servidor.login(usuario_smtp, contrasena_smtp)
+        servidor.sendmail(usuario_smtp, to_email, msg.as_string())
+        servidor.quit()
+        logger.info("Correo '%s' enviado exitosamente a %s.", subject, to_email)
+        return True
+    except Exception as error:
+        logger.error("Error al enviar correo genérico: %s", error)
+        return False
+
 
 if __name__ == "__main__":
     send_audit_report("SAI_Analitica_Global.csv", {"total_orders": 0})

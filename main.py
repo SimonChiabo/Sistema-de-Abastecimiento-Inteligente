@@ -98,33 +98,36 @@ def run_orchestrator(modo_manual: bool = False) -> None:
                     confirmado = str(fila[4]).upper() == "TRUE"
 
                     # 1. Si hay un pedido nuevo, lo procesamos
-                    if confirmado and cantidad_str:
-                        logger.info("  [NUEVO PEDIDO - SKU: %s] Cantidad: %s", sku_id, cantidad_str)
-                        cantidad = float(cantidad_str.replace(",", "."))
+                    if confirmado:
+                        if cantidad_str:
+                            logger.info("  [NUEVO PEDIDO - SKU: %s] Cantidad: %s", sku_id, cantidad_str)
+                            cantidad = float(cantidad_str.replace(",", "."))
 
-                        # Lógica de horarios
-                        prov_id = sku_a_prov.get(sku_id)
-                        hora_limite_str = hora_limite_prov.get(prov_id, "23:59")
-                        ahora = dt.now().time()
-                        hora_limite = dt.strptime(hora_limite_str, "%H:%M").time()
+                            # Lógica de horarios
+                            prov_id = sku_a_prov.get(sku_id)
+                            hora_limite_str = hora_limite_prov.get(prov_id, "23:59")
+                            ahora = dt.now().time()
+                            hora_limite = dt.strptime(hora_limite_str, "%H:%M").time()
 
-                        estatus = OrderStatus.PENDING
-                        mensaje_log = f"OK {dt.now().strftime('%H:%M')}"
+                            estatus = OrderStatus.PENDING
+                            mensaje_log = f"OK {dt.now().strftime('%H:%M')}"
 
-                        if not modo_manual and ahora > hora_limite:
-                            estatus = OrderStatus.LATE
-                            mensaje_log = f"LATE ({hora_limite_str})"
+                            if not modo_manual and ahora > hora_limite:
+                                estatus = OrderStatus.LATE
+                                mensaje_log = f"LATE ({hora_limite_str})"
 
-                        if modo_manual:
-                            mensaje_log = f"MANUAL {dt.now().strftime('%H:%M')}"
+                            if modo_manual:
+                                mensaje_log = f"MANUAL {dt.now().strftime('%H:%M')}"
 
-                        # Registrar en DB local
-                        add_to_buffer(sku_id, cantidad, nombre_local, proveedor_id=prov_id, status=estatus)
-                        
-                        # Preparar limpieza de fila de entrada
-                        actualizaciones_batch.append({"range": f"C{indice}", "values": [[""]]})
+                            # Registrar en DB local
+                            add_to_buffer(sku_id, cantidad, nombre_local, proveedor_id=prov_id, status=estatus)
+                            
+                            # Preparar limpieza de cantidad y log
+                            actualizaciones_batch.append({"range": f"C{indice}", "values": [[""]]})
+                            actualizaciones_batch.append({"range": f"F{indice}", "values": [[mensaje_log]]})
+
+                        # SIEMPRE reseteamos el checkbox si estaba marcado, para limpiar la UI
                         actualizaciones_batch.append({"range": f"E{indice}", "values": [[False]]})
-                        actualizaciones_batch.append({"range": f"F{indice}", "values": [[mensaje_log]]})
 
                     # 2. SIEMPRE actualizamos el acumulado (Columna D) para reflejar la realidad de la DB
                     acumulado_real = _obtener_acumulado_de_db(sku_id, nombre_local)
@@ -156,6 +159,21 @@ def run_orchestrator(modo_manual: bool = False) -> None:
         logger.info("Warehouse sync desactivado (WAREHOUSE_SYNC_ENABLED=false).")
 
     logger.info("Ciclo SAI Multi-Local finalizado.")
+    
+    if modo_manual:
+        from core.notifier import send_generic_email
+        destinatario_demo = os.getenv("ADMIN_EMAIL", "simonchiabo@gmail.com")
+        logger.info("  [DEMO] Enviando confirmación de captura a %s...", destinatario_demo)
+        send_generic_email(
+            subject="DEMO SAI: Captura de Pedidos Exitosa",
+            body="""
+            <h3>¡El ciclo de captura ha finalizado!</h3>
+            <p>Los pedidos de los locales han sido procesados y consolidados en la base de datos central.</p>
+            <p><strong>Próximo paso:</strong> Ejecutar el despachador (mailer) para generar las Órdenes de Compra.</p>
+            """,
+            to_email=destinatario_demo,
+            is_html=True
+        )
 
 
 if __name__ == "__main__":

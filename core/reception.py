@@ -101,12 +101,14 @@ def process_reception_feedback() -> None:
                 continue
 
             filas_procesadas = 0
+            filas_para_borrar = []
 
             # start=2: fila 1 = encabezados, filas de datos comienzan en fila 2
             for indice_fila, fila in enumerate(datos, start=2):
                 # Saltar filas ya procesadas en ciclos anteriores
                 procesado = str(fila.get("Procesado", "")).strip().upper()
                 if procesado == "SI":
+                    filas_para_borrar.append(indice_fila)
                     continue
 
                 id_historial = fila.get("ID_HISTORIAL")
@@ -138,8 +140,9 @@ def process_reception_feedback() -> None:
                     )
 
                     if exito:
-                        # Marcar fila como procesada en columna H
+                        # Marcar fila como procesada
                         ws.update_cell(indice_fila, 8, "SI")
+                        filas_para_borrar.append(indice_fila)
                         filas_procesadas += 1
                         logger.info(
                             "Fila %d marcada como procesada (ID_HISTORIAL: %s).",
@@ -163,6 +166,12 @@ def process_reception_feedback() -> None:
                     logger.warning(
                         "Error en fila %d de %s: %s", indice_fila, nombre_local, error_fila
                     )
+
+            # Limpieza de filas procesadas (de abajo hacia arriba)
+            if filas_para_borrar:
+                for idx in sorted(filas_para_borrar, reverse=True):
+                    ws.delete_rows(idx)
+                logger.info("  Borradas %d filas procesadas de RECEPCION en %s", len(filas_para_borrar), nombre_local)
 
             logger.info(
                 "Feedback procesado para %s: %d filas nuevas.",

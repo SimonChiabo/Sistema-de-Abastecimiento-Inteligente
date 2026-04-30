@@ -51,3 +51,196 @@
 2026-04-30 14:15:27 | __main__ | INFO |   Encabezado formateado en 'RECEPCION'.
 2026-04-30 14:15:27 | __main__ | INFO |   Encabezado formateado en 'RECLAMOS'.
 2026-04-30 14:15:27 | __main__ | INFO | Configuración de 'SAI_Local_Template' completada exitosamente. URL: https://docs.google.com/spreadsheets/d/1rsAGHFyydAMKwImaopHDJKRCF1SVzF8AZGh8KtgY2h0
+2026-04-30 18:36:16 | __main__ | INFO | Verificando configuración SMTP...
+2026-04-30 18:36:16 | __main__ | INFO | Intentando handshake con smtp.gmail.com:587 usando cuenta simonchiabo@gmail.com...
+2026-04-30 18:36:16 | __main__ | INFO | Autenticando...
+2026-04-30 18:36:17 | __main__ | INFO | Enviando correo de prueba a simonchiabo@gmail.com...
+2026-04-30 18:36:17 | __main__ | INFO | CONEXIÓN EXITOSA: El correo fue enviado a simonchiabo@gmail.com.
+2026-04-30 18:38:33 | __main__ | INFO | Iniciando ciclo SAI Multi-Local: 2026-04-30 18:38:33
+2026-04-30 18:38:33 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:38:33 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:38:35 | core.auth | INFO | Spreadsheet maestro 'SAI - Sistema de Abastecimiento' abierto correctamente.
+2026-04-30 18:38:38 | __main__ | INFO | Se encontraron 1 locales para procesar.
+2026-04-30 18:38:38 | __main__ | INFO | Procesando local: SAI_Local_Template
+2026-04-30 18:38:41 | __main__ | INFO |   [NUEVO PEDIDO - SKU: SKU-BEB-01] Cantidad: 100
+2026-04-30 18:38:41 | __main__ | INFO |   [NUEVO PEDIDO - SKU: SKU-CAR-01] Cantidad: 50
+2026-04-30 18:38:41 | core.reception | INFO | Procesando feedback de recepción (multi-local)...
+2026-04-30 18:38:41 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:38:45 | core.reception | INFO | Procesando resoluciones de reclamos (multi-local)...
+2026-04-30 18:38:45 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:38:49 | warehouse_sync | INFO | Sincronizando data warehouse (BI)...
+2026-04-30 18:38:49 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:38:49 | warehouse_sync | INFO | Conectado al warehouse: SAI_Data_Warehouse
+2026-04-30 18:38:53 | warehouse_sync | INFO | 57 registros inyectados en el warehouse.
+2026-04-30 18:38:53 | __main__ | INFO | Ciclo SAI Multi-Local finalizado.
+2026-04-30 18:38:53 | __main__ | INFO |   [DEMO] Enviando confirmación de captura a simonchiabo@gmail.com...
+2026-04-30 18:38:54 | core.notifier | INFO | Correo 'DEMO SAI: Captura de Pedidos Exitosa' enviado exitosamente a simonchiabo@gmail.com.
+2026-04-30 18:39:45 | __main__ | INFO | Orquestador de despacho SAI v2.0: 18:39
+2026-04-30 18:39:45 | __main__ | INFO | MODO MANUAL ACTIVADO: Se omitirán validaciones de horario y frecuencia.
+2026-04-30 18:39:45 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:39:47 | core.auth | INFO | Spreadsheet maestro 'SAI - Sistema de Abastecimiento' abierto correctamente.
+2026-04-30 18:39:48 | __main__ | INFO | Despachando OC: Proveedor de Bebidas y Bodega | Items: 1
+2026-04-30 18:39:48 | __main__ | INFO |   [DEMO] Enviando copia de OC a simonchiabo@gmail.com...
+2026-04-30 18:39:50 | core.notifier | INFO | Correo 'DEMO SAI: Orden de Compra - Proveedor de Bebidas y Bodega' enviado exitosamente a simonchiabo@gmail.com.
+2026-04-30 18:39:50 | core.db_handler | INFO | ARCHIVE: 1 registros movidos al historial para PROV-DEMO-03.
+2026-04-30 18:39:50 | __main__ | INFO | Despachando OC: Distribuidora Global Carnicos | Items: 1
+2026-04-30 18:39:50 | __main__ | INFO |   [DEMO] Enviando copia de OC a simonchiabo@gmail.com...
+2026-04-30 18:39:51 | core.notifier | INFO | Correo 'DEMO SAI: Orden de Compra - Distribuidora Global Carnicos' enviado exitosamente a simonchiabo@gmail.com.
+2026-04-30 18:39:51 | core.db_handler | INFO | ARCHIVE: 1 registros movidos al historial para PROV-DEMO-01.
+2026-04-30 18:39:51 | core.reception | INFO | Sincronizando pestañas RECEPCION (distribuidas)...
+2026-04-30 18:39:51 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:39:52 | core.reception | INFO | Inyectando 2 pedidos en SAI_Local_Template...
+2026-04-30 18:39:57 | core.reception | INFO | Sincronización descentralizada completada.
+2026-04-30 18:39:57 | __main__ | INFO | Ciclo terminado. 2 OCs generadas y archivadas.
+2026-04-30 18:43:43 | __main__ | INFO | Iniciando ciclo SAI Multi-Local: 2026-04-30 18:43:43
+2026-04-30 18:43:43 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:43:43 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:43:45 | core.auth | INFO | Spreadsheet maestro 'SAI - Sistema de Abastecimiento' abierto correctamente.
+2026-04-30 18:43:47 | __main__ | INFO | Se encontraron 1 locales para procesar.
+2026-04-30 18:43:47 | __main__ | INFO | Procesando local: SAI_Local_Template
+2026-04-30 18:43:51 | core.reception | INFO | Procesando feedback de recepción (multi-local)...
+2026-04-30 18:43:51 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:43:55 | core.reception | INFO | Fila 2 marcada como procesada (ID_HISTORIAL: 58).
+2026-04-30 18:43:57 | core.reception | INFO |   Reclamo inyectado en RECLAMOS para 58
+2026-04-30 18:43:58 | core.reception | INFO | Fila 3 marcada como procesada (ID_HISTORIAL: 59).
+2026-04-30 18:43:58 | core.reception | INFO | Feedback procesado para SAI_Local_Template: 2 filas nuevas.
+2026-04-30 18:43:58 | core.reception | INFO | Procesando resoluciones de reclamos (multi-local)...
+2026-04-30 18:43:58 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:44:01 | warehouse_sync | INFO | Sincronizando data warehouse (BI)...
+2026-04-30 18:44:01 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:44:02 | warehouse_sync | INFO | Conectado al warehouse: SAI_Data_Warehouse
+2026-04-30 18:44:04 | warehouse_sync | INFO | 59 registros inyectados en el warehouse.
+2026-04-30 18:44:04 | __main__ | INFO | Ciclo SAI Multi-Local finalizado.
+2026-04-30 18:44:04 | __main__ | INFO |   [DEMO] Enviando confirmación de captura a simonchiabo@gmail.com...
+2026-04-30 18:44:05 | core.notifier | INFO | Correo 'DEMO SAI: Captura de Pedidos Exitosa' enviado exitosamente a simonchiabo@gmail.com.
+2026-04-30 18:50:15 | __main__ | INFO | Iniciando ciclo SAI Multi-Local: 2026-04-30 18:50:15
+2026-04-30 18:50:15 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:50:15 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:50:17 | core.auth | INFO | Spreadsheet maestro 'SAI - Sistema de Abastecimiento' abierto correctamente.
+2026-04-30 18:50:21 | __main__ | INFO | Se encontraron 1 locales para procesar.
+2026-04-30 18:50:21 | __main__ | INFO | Procesando local: SAI_Local_Template
+2026-04-30 18:50:23 | core.reception | INFO | Procesando feedback de recepción (multi-local)...
+2026-04-30 18:50:23 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:50:28 | core.reception | INFO |   Borradas 2 filas procesadas de RECEPCION en SAI_Local_Template
+2026-04-30 18:50:28 | core.reception | INFO | Feedback procesado para SAI_Local_Template: 0 filas nuevas.
+2026-04-30 18:50:28 | core.reception | INFO | Procesando resoluciones de reclamos (multi-local)...
+2026-04-30 18:50:28 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:50:31 | warehouse_sync | INFO | Sincronizando data warehouse (BI)...
+2026-04-30 18:50:31 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:50:31 | warehouse_sync | INFO | Conectado al warehouse: SAI_Data_Warehouse
+2026-04-30 18:50:33 | warehouse_sync | INFO | 59 registros inyectados en el warehouse.
+2026-04-30 18:50:33 | __main__ | INFO | Ciclo SAI Multi-Local finalizado.
+2026-04-30 18:50:33 | __main__ | INFO |   [DEMO] Enviando confirmación de captura a simonchiabo@gmail.com...
+2026-04-30 18:50:34 | core.notifier | INFO | Correo 'DEMO SAI: Captura de Pedidos Exitosa' enviado exitosamente a simonchiabo@gmail.com.
+2026-04-30 18:51:28 | __main__ | INFO | Iniciando ciclo SAI Multi-Local: 2026-04-30 18:51:28
+2026-04-30 18:51:28 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:51:28 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:51:29 | core.auth | INFO | Spreadsheet maestro 'SAI - Sistema de Abastecimiento' abierto correctamente.
+2026-04-30 18:51:32 | __main__ | INFO | Se encontraron 1 locales para procesar.
+2026-04-30 18:51:32 | __main__ | INFO | Procesando local: SAI_Local_Template
+2026-04-30 18:51:34 | __main__ | INFO |   [NUEVO PEDIDO - SKU: SKU-CAR-01] Cantidad: 100
+2026-04-30 18:51:34 | __main__ | INFO |   [NUEVO PEDIDO - SKU: SKU-BEB-01] Cantidad: 40
+2026-04-30 18:51:34 | core.reception | INFO | Procesando feedback de recepción (multi-local)...
+2026-04-30 18:51:34 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:51:42 | core.reception | INFO | Procesando resoluciones de reclamos (multi-local)...
+2026-04-30 18:51:42 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:51:45 | warehouse_sync | INFO | Sincronizando data warehouse (BI)...
+2026-04-30 18:51:45 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:51:46 | warehouse_sync | INFO | Conectado al warehouse: SAI_Data_Warehouse
+2026-04-30 18:51:48 | warehouse_sync | INFO | 59 registros inyectados en el warehouse.
+2026-04-30 18:51:48 | __main__ | INFO | Ciclo SAI Multi-Local finalizado.
+2026-04-30 18:51:48 | __main__ | INFO |   [DEMO] Enviando confirmación de captura a simonchiabo@gmail.com...
+2026-04-30 18:51:49 | core.notifier | INFO | Correo 'DEMO SAI: Captura de Pedidos Exitosa' enviado exitosamente a simonchiabo@gmail.com.
+2026-04-30 18:52:09 | __main__ | INFO | Iniciando ciclo SAI Multi-Local: 2026-04-30 18:52:09
+2026-04-30 18:52:09 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:52:09 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:52:11 | core.auth | INFO | Spreadsheet maestro 'SAI - Sistema de Abastecimiento' abierto correctamente.
+2026-04-30 18:52:14 | __main__ | INFO | Se encontraron 1 locales para procesar.
+2026-04-30 18:52:14 | __main__ | INFO | Procesando local: SAI_Local_Template
+2026-04-30 18:52:16 | __main__ | INFO |   [NUEVO PEDIDO - SKU: SKU-CAR-01] Cantidad: 40
+2026-04-30 18:52:17 | core.reception | INFO | Procesando feedback de recepción (multi-local)...
+2026-04-30 18:52:17 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:52:21 | core.reception | INFO | Procesando resoluciones de reclamos (multi-local)...
+2026-04-30 18:52:21 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:52:24 | warehouse_sync | INFO | Sincronizando data warehouse (BI)...
+2026-04-30 18:52:24 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:52:24 | warehouse_sync | INFO | Conectado al warehouse: SAI_Data_Warehouse
+2026-04-30 18:52:26 | warehouse_sync | INFO | 59 registros inyectados en el warehouse.
+2026-04-30 18:52:26 | __main__ | INFO | Ciclo SAI Multi-Local finalizado.
+2026-04-30 18:52:26 | __main__ | INFO |   [DEMO] Enviando confirmación de captura a simonchiabo@gmail.com...
+2026-04-30 18:52:27 | core.notifier | INFO | Correo 'DEMO SAI: Captura de Pedidos Exitosa' enviado exitosamente a simonchiabo@gmail.com.
+2026-04-30 18:53:19 | __main__ | INFO | Iniciando ciclo SAI Multi-Local: 2026-04-30 18:53:19
+2026-04-30 18:53:19 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:53:19 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:53:20 | core.auth | INFO | Spreadsheet maestro 'SAI - Sistema de Abastecimiento' abierto correctamente.
+2026-04-30 18:53:24 | __main__ | INFO | Se encontraron 1 locales para procesar.
+2026-04-30 18:53:24 | __main__ | INFO | Procesando local: SAI_Local_Template
+2026-04-30 18:53:26 | core.reception | INFO | Procesando feedback de recepción (multi-local)...
+2026-04-30 18:53:26 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:53:29 | core.reception | INFO | Procesando resoluciones de reclamos (multi-local)...
+2026-04-30 18:53:29 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:53:33 | warehouse_sync | INFO | Sincronizando data warehouse (BI)...
+2026-04-30 18:53:33 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 18:53:33 | warehouse_sync | INFO | Conectado al warehouse: SAI_Data_Warehouse
+2026-04-30 18:53:35 | warehouse_sync | INFO | 59 registros inyectados en el warehouse.
+2026-04-30 18:53:35 | __main__ | INFO | Ciclo SAI Multi-Local finalizado.
+2026-04-30 18:53:35 | __main__ | INFO |   [DEMO] Enviando confirmación de captura a simonchiabo@gmail.com...
+2026-04-30 18:53:36 | core.notifier | INFO | Correo 'DEMO SAI: Captura de Pedidos Exitosa' enviado exitosamente a simonchiabo@gmail.com.
+2026-04-30 19:02:29 | __main__ | INFO | Orquestador de despacho SAI v2.0: 19:02
+2026-04-30 19:02:29 | __main__ | INFO | MODO MANUAL ACTIVADO: Se omitirán validaciones de horario y frecuencia.
+2026-04-30 19:02:29 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 19:02:30 | core.auth | INFO | Spreadsheet maestro 'SAI - Sistema de Abastecimiento' abierto correctamente.
+2026-04-30 19:02:32 | __main__ | INFO | Despachando OC: Distribuidora Global Carnicos | Items: 1
+2026-04-30 19:02:32 | __main__ | INFO |   [DEMO] Enviando copia de OC a simonchiabo@gmail.com...
+2026-04-30 19:02:33 | core.notifier | INFO | Correo 'DEMO SAI: Orden de Compra - Distribuidora Global Carnicos' enviado exitosamente a simonchiabo@gmail.com.
+2026-04-30 19:02:33 | core.db_handler | INFO | ARCHIVE: 1 registros movidos al historial para PROV-DEMO-01.
+2026-04-30 19:02:33 | __main__ | INFO | Despachando OC: Proveedor de Bebidas y Bodega | Items: 1
+2026-04-30 19:02:33 | __main__ | INFO |   [DEMO] Enviando copia de OC a simonchiabo@gmail.com...
+2026-04-30 19:02:35 | core.notifier | INFO | Correo 'DEMO SAI: Orden de Compra - Proveedor de Bebidas y Bodega' enviado exitosamente a simonchiabo@gmail.com.
+2026-04-30 19:02:35 | core.db_handler | INFO | ARCHIVE: 1 registros movidos al historial para PROV-DEMO-03.
+2026-04-30 19:02:35 | core.reception | INFO | Sincronizando pestañas RECEPCION (distribuidas)...
+2026-04-30 19:02:35 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 19:02:36 | core.reception | INFO | Inyectando 2 pedidos en SAI_Local_Template...
+2026-04-30 19:02:40 | core.reception | INFO | Sincronización descentralizada completada.
+2026-04-30 19:02:40 | __main__ | INFO | Ciclo terminado. 2 OCs generadas y archivadas.
+2026-04-30 20:50:43 | __main__ | INFO | Orquestador de despacho SAI v2.0: 20:50
+2026-04-30 20:50:43 | __main__ | INFO | MODO MANUAL ACTIVADO: Se omitirán validaciones de horario y frecuencia.
+2026-04-30 20:50:43 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 20:50:45 | core.auth | INFO | Spreadsheet maestro 'SAI - Sistema de Abastecimiento' abierto correctamente.
+2026-04-30 20:50:48 | __main__ | INFO | No hay pedidos pendientes en buffer.
+2026-04-30 20:51:18 | __main__ | INFO | Iniciando ciclo SAI Multi-Local: 2026-04-30 20:51:18
+2026-04-30 20:51:18 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 20:51:18 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 20:51:19 | core.auth | INFO | Spreadsheet maestro 'SAI - Sistema de Abastecimiento' abierto correctamente.
+2026-04-30 20:51:23 | __main__ | INFO | Se encontraron 1 locales para procesar.
+2026-04-30 20:51:23 | __main__ | INFO | Procesando local: SAI_Local_Template
+2026-04-30 20:51:27 | core.reception | INFO | Procesando feedback de recepción (multi-local)...
+2026-04-30 20:51:27 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 20:51:31 | core.reception | INFO | Feedback procesado para SAI_Local_Template: 0 filas nuevas.
+2026-04-30 20:51:31 | core.reception | INFO | Procesando resoluciones de reclamos (multi-local)...
+2026-04-30 20:51:31 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 20:51:34 | warehouse_sync | INFO | Sincronizando data warehouse (BI)...
+2026-04-30 20:51:34 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 20:51:35 | warehouse_sync | INFO | Conectado al warehouse: SAI_Data_Warehouse
+2026-04-30 20:51:38 | warehouse_sync | INFO | 61 registros inyectados en el warehouse.
+2026-04-30 20:51:38 | __main__ | INFO | Ciclo SAI Multi-Local finalizado.
+2026-04-30 20:51:38 | __main__ | INFO |   [DEMO] Enviando confirmación de captura a simonchiabo@gmail.com...
+2026-04-30 20:51:39 | core.notifier | INFO | Correo 'DEMO SAI: Captura de Pedidos Exitosa' enviado exitosamente a simonchiabo@gmail.com.
+2026-04-30 21:06:15 | __main__ | INFO | Iniciando ciclo SAI Multi-Local: 2026-04-30 21:06:15
+2026-04-30 21:06:15 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 21:06:15 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 21:06:18 | core.auth | INFO | Spreadsheet maestro 'SAI - Sistema de Abastecimiento' abierto correctamente.
+2026-04-30 21:06:22 | __main__ | INFO | Se encontraron 1 locales para procesar.
+2026-04-30 21:06:22 | __main__ | INFO | Procesando local: SAI_Local_Template
+2026-04-30 21:06:25 | core.reception | INFO | Procesando feedback de recepción (multi-local)...
+2026-04-30 21:06:25 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 21:06:29 | core.reception | INFO | Feedback procesado para SAI_Local_Template: 0 filas nuevas.
+2026-04-30 21:06:29 | core.reception | INFO | Procesando resoluciones de reclamos (multi-local)...
+2026-04-30 21:06:29 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 21:06:33 | warehouse_sync | INFO | Sincronizando data warehouse (BI)...
+2026-04-30 21:06:33 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 21:06:33 | warehouse_sync | INFO | Conectado al warehouse: SAI_Data_Warehouse
+2026-04-30 21:06:36 | warehouse_sync | INFO | 61 registros inyectados en el warehouse.
+2026-04-30 21:06:36 | __main__ | INFO | Ciclo SAI Multi-Local finalizado.
+2026-04-30 21:06:36 | __main__ | INFO |   [DEMO] Enviando confirmación de captura a simonchiabo@gmail.com...
+2026-04-30 21:06:37 | core.notifier | INFO | Correo 'DEMO SAI: Captura de Pedidos Exitosa' enviado exitosamente a simonchiabo@gmail.com.

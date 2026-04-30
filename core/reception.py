@@ -8,7 +8,7 @@ import os
 from dotenv import load_dotenv
 
 from core.auth import obtener_cliente_gsheets
-from core.db_handler import OrderHistory, Session, update_history_fulfillment
+from core.db_handler import OrderHistory, Session, update_history_fulfillment, resolve_claim
 
 load_dotenv()
 
@@ -128,8 +128,8 @@ def process_reception_feedback() -> None:
 
                     if estado in ("CANCELADO", "RECHAZADO"):
                         estatus = "CANCELLED"
-                    elif cant_recibida < cant_pedida:
-                        estatus = "PARTIAL"
+                    elif estado in ("DAÑADO", "FALTANTE") or cant_recibida < cant_pedida:
+                        estatus = "PENDING_RECTIFICATION"
                     else:
                         estatus = "COMPLETE"
 
@@ -138,13 +138,26 @@ def process_reception_feedback() -> None:
                     )
 
                     if exito:
-                        # Marcar fila como procesada en columna H para evitar reprocesamiento
+                        # Marcar fila como procesada en columna H
                         ws.update_cell(indice_fila, 8, "SI")
                         filas_procesadas += 1
                         logger.info(
                             "Fila %d marcada como procesada (ID_HISTORIAL: %s).",
                             indice_fila, id_historial,
                         )
+                        
+                        if estatus == "PENDING_RECTIFICATION":
+                            cant_faltante = cant_pedida - cant_recibida
+                            try:
+                                ws_reclamos = sh.worksheet("RECLAMOS")
+                                ws_reclamos.append_row([
+                                    id_historial, fila.get("SKU_ID"), fila.get("Producto"),
+                                    cant_pedida, cant_faltante, f"[{estado}] {notas}",
+                                    "ESPERANDO_MERCADERIA", ""
+                                ])
+                                logger.info("  Reclamo inyectado en RECLAMOS para %s", id_historial)
+                            except Exception as e_reclamo:
+                                logger.error("  No se pudo inyectar reclamo: %s", e_reclamo)
 
                 except (ValueError, KeyError) as error_fila:
                     logger.warning(
@@ -159,6 +172,52 @@ def process_reception_feedback() -> None:
         except Exception as error:
             logger.error("Error leyendo feedback de %s: %s", nombre_local, error)
 
+def process_claims_feedback() -> None:
+    """Recolecta la resolución de la pestaña RECLAMOS y actualiza la BD."""
+    logger.info("Procesando resoluciones de reclamos (multi-local)...")
+    cliente = obtener_cliente_gsheets()
+    todos_los_archivos = cliente.list_spreadsheet_files()
+    archivos_locales = [f for f in todos_los_archivos if f["name"].startswith(PREFIJO_LOCAL)]
+
+    for entrada in archivos_locales:
+        nombre_local = entrada["name"]
+        try:
+            sh = cliente.open_by_key(entrada["id"])
+            try:
+                ws_reclamos = sh.worksheet("RECLAMOS")
+            except Exception:
+                continue
+
+            datos = ws_reclamos.get_all_records()
+            if not datos:
+                continue
+            
+            filas_para_borrar = []
+            
+            for indice_fila, fila in enumerate(datos, start=2):
+                procesado = str(fila.get("Procesado", "")).strip().upper()
+                if procesado == "SI":
+                    filas_para_borrar.append(indice_fila)
+                    continue
+                
+                accion = str(fila.get("Accion_Resolucion", "")).strip().upper()
+                if accion in ("RESUELTO_ENTREGADO", "CANCELADO_SIN_STOCK"):
+                    id_historial = fila.get("ID_HISTORIAL")
+                    if id_historial:
+                        exito = resolve_claim(id_historial, accion)
+                        if exito:
+                            ws_reclamos.update_cell(indice_fila, 8, "SI")
+                            filas_para_borrar.append(indice_fila)
+                            logger.info("  Reclamo resuelto %s: %s", id_historial, accion)
+            
+            # Limpiar filas procesadas de abajo hacia arriba para evitar desfasaje de índices
+            if filas_para_borrar:
+                for idx in sorted(filas_para_borrar, reverse=True):
+                    ws_reclamos.delete_rows(idx)
+                logger.info("  Borradas %d filas procesadas de RECLAMOS en %s", len(filas_para_borrar), nombre_local)
+
+        except Exception as e:
+            logger.error("Error procesando reclamos en %s: %s", nombre_local, e)
 
 if __name__ == "__main__":
     sync_reception_tab()

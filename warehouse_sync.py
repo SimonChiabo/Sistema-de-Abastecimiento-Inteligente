@@ -54,7 +54,7 @@ def sync_to_warehouse() -> None:
     encabezados = [
         "ID", "SKU_ID", "SKU_Nombre", "Centro_Costo", "Cant_Pedida", "Cant_Recibida",
         "Proveedor_ID", "Proveedor_Nombre", "Fecha_Pedido", "Fecha_Archivo",
-        "Precio_Unit", "Total_Linea", "Status_Cumplimiento", "Notas",
+        "Precio_Unit", "Total_Linea", "Total_Real", "Status_Cumplimiento", "Notas",
     ]
     ws.append_row(encabezados)
     ws.format(
@@ -85,6 +85,7 @@ def sync_to_warehouse() -> None:
 
         filas = []
         for h, nombre_prov, nombre_sku in resultados:
+            total_real = (h.received_quantity or 0.0) * (h.precio_compra_final or 0.0)
             filas.append([
                 h.id,
                 h.sku_id,
@@ -98,6 +99,7 @@ def sync_to_warehouse() -> None:
                 h.fecha_archivo.strftime("%Y-%m-%d") if h.fecha_archivo else "",
                 h.precio_compra_final,
                 h.total_linea,
+                total_real,
                 h.fulfillment_status,
                 h.incident_notes or "",
             ])

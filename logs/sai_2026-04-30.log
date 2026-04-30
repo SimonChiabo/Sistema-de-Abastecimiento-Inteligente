@@ -1,0 +1,53 @@
+2026-04-30 10:41:07 | __main__ | INFO | Iniciando configuración de local: 'SAI_Local_Template'
+2026-04-30 10:41:07 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 10:41:08 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 10:41:09 | core.auth | INFO | Spreadsheet maestro 'SAI - Sistema de Abastecimiento' abierto correctamente.
+2026-04-30 10:41:11 | __main__ | INFO | Spreadsheet 'SAI_Local_Template' abierto. ID: 1rsAGHFyydAMKwImaopHDJKRCF1SVzF8AZGh8KtgY2h0
+2026-04-30 10:41:11 | __main__ | INFO | Paso 1: Creando estructura base de pestañas...
+2026-04-30 10:41:13 | __main__ | INFO |   Pestaña '_DB_INTERNAL' limpiada.
+2026-04-30 10:41:15 | __main__ | INFO |   Pestaña 'PEDIDOS' limpiada.
+2026-04-30 10:41:17 | __main__ | INFO |   Pestaña 'STOCK' limpiada.
+2026-04-30 10:41:20 | __main__ | INFO |   Pestaña 'RECEPCION' limpiada.
+2026-04-30 10:41:22 | __main__ | INFO | Paso 2: Aplicando validaciones de datos y seguridad...
+2026-04-30 10:41:23 | __main__ | INFO |   Validaciones aplicadas correctamente.
+2026-04-30 10:41:23 | __main__ | INFO | Paso 3: Aplicando formato corporativo a encabezados...
+2026-04-30 10:41:24 | __main__ | INFO |   Encabezado formateado en 'PEDIDOS'.
+2026-04-30 10:41:24 | __main__ | INFO |   Encabezado formateado en 'STOCK'.
+2026-04-30 10:41:24 | __main__ | INFO |   Encabezado formateado en 'RECEPCION'.
+2026-04-30 10:41:24 | __main__ | INFO | Configuración de 'SAI_Local_Template' completada exitosamente. URL: https://docs.google.com/spreadsheets/d/1rsAGHFyydAMKwImaopHDJKRCF1SVzF8AZGh8KtgY2h0
+2026-04-30 11:26:01 | __main__ | INFO | Iniciando configuración de local: 'SAI_Local_Template'
+2026-04-30 11:26:01 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 11:26:01 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 11:26:02 | core.auth | INFO | Spreadsheet maestro 'SAI - Sistema de Abastecimiento' abierto correctamente.
+2026-04-30 11:26:04 | __main__ | INFO | Spreadsheet 'SAI_Local_Template' abierto. ID: 1rsAGHFyydAMKwImaopHDJKRCF1SVzF8AZGh8KtgY2h0
+2026-04-30 11:26:04 | __main__ | INFO | Paso 1: Creando estructura base de pestañas...
+2026-04-30 11:26:05 | __main__ | INFO |   Pestaña '_DB_INTERNAL' limpiada.
+2026-04-30 11:26:06 | __main__ | INFO |   Pestaña 'PEDIDOS' limpiada.
+2026-04-30 11:26:08 | __main__ | INFO |   Pestaña 'STOCK' limpiada.
+2026-04-30 11:26:10 | __main__ | INFO |   Pestaña 'RECEPCION' limpiada.
+2026-04-30 11:26:13 | __main__ | INFO | Paso 2: Aplicando validaciones de datos y seguridad...
+2026-04-30 11:26:14 | __main__ | INFO |   Validaciones aplicadas correctamente.
+2026-04-30 11:26:14 | __main__ | INFO | Paso 3: Aplicando formato corporativo a encabezados...
+2026-04-30 11:26:14 | __main__ | INFO |   Encabezado formateado en 'PEDIDOS'.
+2026-04-30 11:26:14 | __main__ | INFO |   Encabezado formateado en 'STOCK'.
+2026-04-30 11:26:14 | __main__ | INFO |   Encabezado formateado en 'RECEPCION'.
+2026-04-30 11:26:14 | __main__ | INFO | Configuración de 'SAI_Local_Template' completada exitosamente. URL: https://docs.google.com/spreadsheets/d/1rsAGHFyydAMKwImaopHDJKRCF1SVzF8AZGh8KtgY2h0
+2026-04-30 14:15:05 | __main__ | INFO | Iniciando configuración de local: 'SAI_Local_Template'
+2026-04-30 14:15:05 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 14:15:05 | core.auth | INFO | Autenticación con Google Sheets exitosa.
+2026-04-30 14:15:06 | core.auth | INFO | Spreadsheet maestro 'SAI - Sistema de Abastecimiento' abierto correctamente.
+2026-04-30 14:15:09 | __main__ | INFO | Spreadsheet 'SAI_Local_Template' abierto. ID: 1rsAGHFyydAMKwImaopHDJKRCF1SVzF8AZGh8KtgY2h0
+2026-04-30 14:15:09 | __main__ | INFO | Paso 1: Creando estructura base de pestañas...
+2026-04-30 14:15:11 | __main__ | INFO |   Pestaña '_DB_INTERNAL' limpiada.
+2026-04-30 14:15:13 | __main__ | INFO |   Pestaña 'PEDIDOS' limpiada.
+2026-04-30 14:15:17 | __main__ | INFO |   Pestaña 'STOCK' limpiada.
+2026-04-30 14:15:21 | __main__ | INFO |   Pestaña 'RECEPCION' limpiada.
+2026-04-30 14:15:22 | __main__ | INFO |   Pestaña 'RECLAMOS' creada.
+2026-04-30 14:15:24 | __main__ | INFO | Paso 2: Aplicando validaciones de datos y seguridad...
+2026-04-30 14:15:25 | __main__ | INFO |   Validaciones aplicadas correctamente.
+2026-04-30 14:15:25 | __main__ | INFO | Paso 3: Aplicando formato corporativo a encabezados...
+2026-04-30 14:15:26 | __main__ | INFO |   Encabezado formateado en 'PEDIDOS'.
+2026-04-30 14:15:26 | __main__ | INFO |   Encabezado formateado en 'STOCK'.
+2026-04-30 14:15:27 | __main__ | INFO |   Encabezado formateado en 'RECEPCION'.
+2026-04-30 14:15:27 | __main__ | INFO |   Encabezado formateado en 'RECLAMOS'.
+2026-04-30 14:15:27 | __main__ | INFO | Configuración de 'SAI_Local_Template' completada exitosamente. URL: https://docs.google.com/spreadsheets/d/1rsAGHFyydAMKwImaopHDJKRCF1SVzF8AZGh8KtgY2h0

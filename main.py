@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from core.auth import obtener_cliente_gsheets, obtener_spreadsheet_maestro
 from core.db_handler import OrderBuffer, OrderStatus, Session, add_to_buffer
 from core.log_config import configurar_logging
-from core.reception import process_reception_feedback
+from core.reception import process_reception_feedback, process_claims_feedback
 
 load_dotenv()
 
@@ -146,6 +146,7 @@ def run_orchestrator(modo_manual: bool = False) -> None:
 
     # 3. Procesar conciliación distribuida
     process_reception_feedback()
+    process_claims_feedback()
 
     # 4. Sincronizar data warehouse (solo si está habilitado en .env)
     if os.getenv("WAREHOUSE_SYNC_ENABLED", "false").lower() == "true":

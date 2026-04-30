@@ -22,56 +22,159 @@ logger = logging.getLogger(__name__)
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
+    <meta charset="UTF-8">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; }
-        .header { background-color: #2c3e50; color: white; padding: 20px; border-top-left-radius: 5px; border-top-right-radius: 5px; }
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --bg: #f8fafc;
+            --text: #0f172a;
+            --text-light: #64748b;
+            --white: #ffffff;
+            --border: #e2e8f0;
+        }
+        body { 
+            font-family: 'Inter', system-ui, -apple-system, sans-serif; 
+            color: var(--text); 
+            background-color: var(--bg);
+            margin: 0;
+            padding: 40px;
+            line-height: 1.5;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--white);
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        .header { 
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%); 
+            color: var(--white); 
+            padding: 40px; 
+            position: relative;
+        }
+        .header h2 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.025em; }
+        .header p { margin: 10px 0 0; opacity: 0.8; font-weight: 300; }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            font-size: 12px;
+            margin-top: 15px;
+        }
+        .content { padding: 40px; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-        th { background-color: #f2f2f2; font-weight: bold; }
-        tr:nth-child(even) { background-color: #f9f9f9; }
+        th { 
+            text-align: left; 
+            padding: 12px 16px; 
+            font-size: 12px; 
+            text-transform: uppercase; 
+            color: var(--text-light);
+            border-bottom: 2px solid var(--border);
+            font-weight: 600;
+        }
+        td { padding: 16px; border-bottom: 1px solid var(--border); }
+        .item-row:hover { background-color: #f1f5f9; }
+        .sku-name { font-weight: 600; color: var(--text); display: block; }
+        .sku-presentation { font-size: 13px; color: var(--text-light); }
         .text-right { text-align: right; }
-        .footer { margin-top: 30px; font-size: 0.85em; color: #7f8c8d; border-top: 1px solid #eee; padding-top: 10px; }
-        .total-row { font-weight: bold; background-color: #ecf0f1 !important; }
+        .qty-badge {
+            background: #f1f5f9;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        .local-breakdown {
+            font-size: 11px;
+            color: var(--text-light);
+            margin-top: 8px;
+            padding-left: 20px;
+            border-left: 2px solid var(--primary);
+            list-style: none;
+            padding: 0 0 0 12px;
+        }
+        .local-item { margin-bottom: 2px; }
+        .footer { 
+            background: #f8fafc;
+            padding: 30px 40px; 
+            font-size: 13px; 
+            color: var(--text-light); 
+            border-top: 1px solid var(--border); 
+        }
+        .total-card {
+            margin-top: 30px;
+            padding: 24px;
+            background: #f1f5f9;
+            border-radius: 12px;
+            text-align: right;
+        }
+        .total-label { font-size: 14px; color: var(--text-light); display: block; }
+        .total-amount { font-size: 32px; font-weight: 700; color: var(--text); }
+        .timestamp { font-size: 11px; opacity: 0.6; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h2>Orden de Compra - SAI</h2>
-        <p>Proveedor: {{ prov_nombre }} | Fecha Despacho: {{ fecha }}</p>
-    </div>
+    <div class="container">
+        <div class="header">
+            <div class="timestamp">CONFIRMACIÓN DE PEDIDO</div>
+            <h2>{{ prov_nombre }}</h2>
+            <p>Orden de Compra Consolidada</p>
+            <div class="badge">Fecha de Despacho: {{ fecha }}</div>
+        </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th>Producto</th>
-                <th>Presentación</th>
-                <th class="text-right">Cant. Total</th>
-                <th class="text-right">Precio Unit.</th>
-                <th class="text-right">Subtotal</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in items %}
-            <tr>
-                <td>{{ item.nombre }}</td>
-                <td>{{ item.presentacion }}</td>
-                <td class="text-right">{{ item.cantidad }}</td>
-                <td class="text-right">${{ "{:,.2f}".format(item.precio_unit) }}</td>
-                <td class="text-right">${{ "{:,.2f}".format(item.subtotal) }}</td>
-            </tr>
-            {% endfor %}
-            <tr class="total-row">
-                <td colspan="4" class="text-right">TOTAL ESTIMADO:</td>
-                <td class="text-right">${{ "{:,.2f}".format(total_orden) }}</td>
-            </tr>
-        </tbody>
-    </table>
+        <div class="content">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Producto / Desglose por Local</th>
+                        <th class="text-right">Cantidad</th>
+                        <th class="text-right">P. Unitario</th>
+                        <th class="text-right">Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr class="item-row">
+                        <td>
+                            <span class="sku-name">{{ item.nombre }}</span>
+                            <span class="sku-presentation">{{ item.presentacion }}</span>
+                            
+                            <ul class="local-breakdown">
+                                {% for local, qty in item.desglose.items() %}
+                                <li class="local-item">
+                                    <strong>{{ local }}:</strong> {{ qty }}
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </td>
+                        <td class="text-right">
+                            <span class="qty-badge">{{ item.cantidad }}</span>
+                        </td>
+                        <td class="text-right">${{ "{:,.2f}".format(item.precio_unit) }}</td>
+                        <td class="text-right" style="font-weight: 600;">${{ "{:,.2f}".format(item.subtotal) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
 
-    <div class="footer">
-        <p>Este pedido consolida todos los requerimientos pendientes hasta la hora de corte.</p>
-        <p>Identificador de Transacción: {{ trx_id }}</p>
+            <div class="total-card">
+                <span class="total-label">VALOR TOTAL ESTIMADO</span>
+                <span class="total-amount">${{ "{:,.2f}".format(total_orden) }}</span>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>Nota importante:</strong> Esta orden consolida los requerimientos de múltiples sucursales a través del sistema SAI. Por favor, asegúrese de etiquetar cada bulto según el desglose adjunto si es posible.</p>
+            <p style="margin-top: 10px;">ID de Transacción: <code>{{ trx_id }}</code></p>
+        </div>
     </div>
 </body>
 </html>
@@ -177,9 +280,17 @@ def run_mailer(modo_manual: bool = False) -> None:
                     "cantidad": 0.0,
                     "precio_unit": precio_unit,
                     "db_refs": [],
+                    "desglose": {},  # Nuevo campo para agrupar por local
                 }
 
             mapa_consolidado[prov_id][sku_id]["cantidad"] += pedido.cantidad
+            
+            # Registrar desglose por local
+            local_name = str(pedido.centro_costo).strip()
+            mapa_consolidado[prov_id][sku_id]["desglose"][local_name] = (
+                mapa_consolidado[prov_id][sku_id]["desglose"].get(local_name, 0.0) + pedido.cantidad
+            )
+            
             mapa_consolidado[prov_id][sku_id]["db_refs"].append(pedido)
 
         # --- FASE 2: Generación de OCs ---

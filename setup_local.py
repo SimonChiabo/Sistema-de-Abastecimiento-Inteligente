@@ -87,6 +87,10 @@ def _crear_estructura_base(sh: gspread.Spreadsheet, id_maestro: str) -> dict:
     ws_rec = _obtener_o_crear("RECEPCION")
     ws_rec.append_row(["ID_Pedido", "SKU_ID", "Producto", "Cant_Pedida", "Cant_Recibida", "Estado_Articulo", "Notas"])
 
+    # Capa de reclamos
+    ws_reclamos = _obtener_o_crear("RECLAMOS")
+    ws_reclamos.append_row(["ID_HISTORIAL", "SKU_ID", "Producto", "Cant_Original_Pedida", "Cant_Faltante", "Notas_Problema", "Accion_Resolucion", "Procesado"])
+
     # Eliminar hoja default si existe
     for nombre_default in ["Hoja 1", "Sheet1", "Hoja1"]:
         try:
@@ -100,6 +104,7 @@ def _crear_estructura_base(sh: gspread.Spreadsheet, id_maestro: str) -> dict:
         "PEDIDOS": ws_pedidos,
         "STOCK": ws_stock,
         "RECEPCION": ws_rec,
+        "RECLAMOS": ws_reclamos,
     }
 
 
@@ -115,6 +120,7 @@ def _aplicar_validaciones(sh: gspread.Spreadsheet, hojas: dict) -> None:
 
     ws_pedidos = hojas["PEDIDOS"]
     ws_db = hojas["_DB_INTERNAL"]
+    ws_rec = hojas["RECEPCION"]
 
     requests = [
         # Ocultar _DB_INTERNAL
@@ -186,6 +192,156 @@ def _aplicar_validaciones(sh: gspread.Spreadsheet, hojas: dict) -> None:
                         "backgroundColor": {"red": 1.0, "green": 0.95, "blue": 0.8}
                     }
                 },
+                "fields": "userEnteredFormat.backgroundColor",
+            }
+        },
+        # Dropdown en RECEPCION!F2:F100 (Estado_Articulo)
+        {
+            "setDataValidation": {
+                "range": {
+                    "sheetId": ws_rec.id,
+                    "startRowIndex": 1, "endRowIndex": 100,
+                    "startColumnIndex": 5, "endColumnIndex": 6,
+                },
+                "rule": {
+                    "condition": {
+                        "type": "ONE_OF_LIST",
+                        "values": [
+                            {"userEnteredValue": "OK"},
+                            {"userEnteredValue": "DAÑADO"},
+                            {"userEnteredValue": "FALTANTE"},
+                            {"userEnteredValue": "RECHAZADO"}
+                        ],
+                    },
+                    "showCustomUi": True,
+                    "strict": True,
+                },
+            }
+        },
+        # Formato condicional: OK (Verde)
+        {
+            "addConditionalFormatRule": {
+                "rule": {
+                    "ranges": [{"sheetId": ws_rec.id, "startRowIndex": 1, "endRowIndex": 100, "startColumnIndex": 5, "endColumnIndex": 6}],
+                    "booleanRule": {
+                        "condition": {"type": "TEXT_EQ", "values": [{"userEnteredValue": "OK"}]},
+                        "format": {"backgroundColor": {"red": 0.85, "green": 0.93, "blue": 0.83}}
+                    }
+                },
+                "index": 0
+            }
+        },
+        # Formato condicional: DAÑADO / FALTANTE (Amarillo)
+        {
+            "addConditionalFormatRule": {
+                "rule": {
+                    "ranges": [{"sheetId": ws_rec.id, "startRowIndex": 1, "endRowIndex": 100, "startColumnIndex": 5, "endColumnIndex": 6}],
+                    "booleanRule": {
+                        "condition": {"type": "TEXT_EQ", "values": [{"userEnteredValue": "DAÑADO"}]},
+                        "format": {"backgroundColor": {"red": 1.0, "green": 0.9, "blue": 0.6}}
+                    }
+                },
+                "index": 1
+            }
+        },
+        {
+            "addConditionalFormatRule": {
+                "rule": {
+                    "ranges": [{"sheetId": ws_rec.id, "startRowIndex": 1, "endRowIndex": 100, "startColumnIndex": 5, "endColumnIndex": 6}],
+                    "booleanRule": {
+                        "condition": {"type": "TEXT_EQ", "values": [{"userEnteredValue": "FALTANTE"}]},
+                        "format": {"backgroundColor": {"red": 1.0, "green": 0.9, "blue": 0.6}}
+                    }
+                },
+                "index": 2
+            }
+        },
+        # Formato condicional: RECHAZADO (Rojo)
+        {
+            "addConditionalFormatRule": {
+                "rule": {
+                    "ranges": [{"sheetId": ws_rec.id, "startRowIndex": 1, "endRowIndex": 100, "startColumnIndex": 5, "endColumnIndex": 6}],
+                    "booleanRule": {
+                        "condition": {"type": "TEXT_EQ", "values": [{"userEnteredValue": "RECHAZADO"}]},
+                        "format": {"backgroundColor": {"red": 0.96, "green": 0.8, "blue": 0.8}}
+                    }
+                },
+                "index": 3
+            }
+        },
+        # Fondo gris para columnas de solo lectura en PEDIDOS (A, D, F)
+        {
+            "repeatCell": {
+                "range": {"sheetId": ws_pedidos.id, "startRowIndex": 1, "endRowIndex": 100, "startColumnIndex": 0, "endColumnIndex": 1},
+                "cell": {"userEnteredFormat": {"backgroundColor": {"red": 0.9, "green": 0.9, "blue": 0.9}}},
+                "fields": "userEnteredFormat.backgroundColor",
+            }
+        },
+        {
+            "repeatCell": {
+                "range": {"sheetId": ws_pedidos.id, "startRowIndex": 1, "endRowIndex": 100, "startColumnIndex": 3, "endColumnIndex": 4},
+                "cell": {"userEnteredFormat": {"backgroundColor": {"red": 0.9, "green": 0.9, "blue": 0.9}}},
+                "fields": "userEnteredFormat.backgroundColor",
+            }
+        },
+        {
+            "repeatCell": {
+                "range": {"sheetId": ws_pedidos.id, "startRowIndex": 1, "endRowIndex": 100, "startColumnIndex": 5, "endColumnIndex": 6},
+                "cell": {"userEnteredFormat": {"backgroundColor": {"red": 0.9, "green": 0.9, "blue": 0.9}}},
+                "fields": "userEnteredFormat.backgroundColor",
+            }
+        },
+        # Fondo gris para columnas de solo lectura en RECEPCION (A a D)
+        {
+            "repeatCell": {
+                "range": {"sheetId": ws_rec.id, "startRowIndex": 1, "endRowIndex": 100, "startColumnIndex": 0, "endColumnIndex": 4},
+                "cell": {"userEnteredFormat": {"backgroundColor": {"red": 0.9, "green": 0.9, "blue": 0.9}}},
+                "fields": "userEnteredFormat.backgroundColor",
+            }
+        },
+        # Resaltar columna E (Cant_Recibida) en RECEPCION en amarillo claro para guiar al usuario
+        {
+            "repeatCell": {
+                "range": {"sheetId": ws_rec.id, "startRowIndex": 1, "endRowIndex": 100, "startColumnIndex": 4, "endColumnIndex": 5},
+                "cell": {"userEnteredFormat": {"backgroundColor": {"red": 1.0, "green": 0.95, "blue": 0.8}}},
+                "fields": "userEnteredFormat.backgroundColor",
+            }
+        },
+        # Validaciones para RECLAMOS (Dropdown)
+        {
+            "setDataValidation": {
+                "range": {
+                    "sheetId": hojas["RECLAMOS"].id,
+                    "startRowIndex": 1, "endRowIndex": 100,
+                    "startColumnIndex": 6, "endColumnIndex": 7,
+                },
+                "rule": {
+                    "condition": {
+                        "type": "ONE_OF_LIST",
+                        "values": [
+                            {"userEnteredValue": "ESPERANDO_MERCADERIA"},
+                            {"userEnteredValue": "RESUELTO_ENTREGADO"},
+                            {"userEnteredValue": "CANCELADO_SIN_STOCK"},
+                        ],
+                    },
+                    "showCustomUi": True,
+                    "strict": True,
+                },
+            }
+        },
+        # Fondo gris A-F en RECLAMOS
+        {
+            "repeatCell": {
+                "range": {"sheetId": hojas["RECLAMOS"].id, "startRowIndex": 1, "endRowIndex": 100, "startColumnIndex": 0, "endColumnIndex": 6},
+                "cell": {"userEnteredFormat": {"backgroundColor": {"red": 0.9, "green": 0.9, "blue": 0.9}}},
+                "fields": "userEnteredFormat.backgroundColor",
+            }
+        },
+        # Resaltar amarillo la columna G en RECLAMOS
+        {
+            "repeatCell": {
+                "range": {"sheetId": hojas["RECLAMOS"].id, "startRowIndex": 1, "endRowIndex": 100, "startColumnIndex": 6, "endColumnIndex": 7},
+                "cell": {"userEnteredFormat": {"backgroundColor": {"red": 1.0, "green": 0.95, "blue": 0.8}}},
                 "fields": "userEnteredFormat.backgroundColor",
             }
         },

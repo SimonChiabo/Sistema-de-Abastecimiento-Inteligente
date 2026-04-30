@@ -173,6 +173,26 @@ def update_history_fulfillment(history_id, received_qty, status, notes=None):
         session.close()
     return False
 
+def resolve_claim(history_id, resolution_action):
+    """Resuelve un reclamo en el historial y lo marca como completado o cancelado."""
+    session = Session()
+    try:
+        entry = session.query(OrderHistory).filter(OrderHistory.id == history_id).first()
+        if entry:
+            if resolution_action == "RESUELTO_ENTREGADO":
+                entry.received_quantity = entry.cantidad
+                entry.fulfillment_status = "COMPLETE_RECTIFIED"
+            elif resolution_action == "CANCELADO_SIN_STOCK":
+                entry.fulfillment_status = "PARTIAL_CLOSED"
+            session.commit()
+            return True
+    except Exception as e:
+        session.rollback()
+        logger.error("Error resolviendo reclamo ID %s: %s", history_id, e)
+    finally:
+        session.close()
+    return False
+
 if __name__ == "__main__":
     from core.log_config import configurar_logging
     configurar_logging()

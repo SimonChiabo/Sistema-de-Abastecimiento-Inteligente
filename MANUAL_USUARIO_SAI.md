@@ -41,6 +41,7 @@ Diseñada para un uso rápido desde tablets y móviles.
 2.  **Cantidad**: Ingrese la cantidad necesaria.
 3.  **Pedidos Acumulados**: Observe esta columna. Si ya hay un número, significa que un compañero ya pidió esa cantidad hoy. **Sume a ese valor si necesita más**.
 4.  **Confirmar**: Marque el checkbox para enviar.
+5.  **Cancelar**: Si cometió un error o ya no necesita el pedido acumulado, marque el checkbox de la columna **G (Cancelar)** y espere al siguiente ciclo del bot para que el acumulado vuelva a cero.
 
 ### 📦 Pestaña: RECEPCIÓN
 Aquí es donde el bot le informará qué pedidos están "En Camino".

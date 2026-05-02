@@ -66,7 +66,7 @@ def _crear_estructura_base(sh: gspread.Spreadsheet, id_maestro: str) -> dict:
 
     # Capa de interfaz de pedidos
     ws_pedidos = _obtener_o_crear("PEDIDOS")
-    ws_pedidos.append_row(["SKU_ID", "Producto", "Cantidad", "Pedidos Acumulados", "Confirmar", "Log"])
+    ws_pedidos.append_row(["SKU_ID", "Producto", "Cantidad", "Pedidos Acumulados", "Confirmar", "Log", "Cancelar"])
 
     # Fórmulas XLOOKUP en columna A (SKU_ID auto-calculado desde el nombre elegido en B)
     formulas_sku = [
@@ -165,6 +165,20 @@ def _aplicar_validaciones(sh: gspread.Spreadsheet, hojas: dict) -> None:
                 },
             }
         },
+        # Checkbox en PEDIDOS!G2:G100 (Cancelar)
+        {
+            "setDataValidation": {
+                "range": {
+                    "sheetId": ws_pedidos.id,
+                    "startRowIndex": 1, "endRowIndex": 100,
+                    "startColumnIndex": 6, "endColumnIndex": 7,
+                },
+                "rule": {
+                    "condition": {"type": "BOOLEAN"},
+                    "showCustomUi": True,
+                },
+            }
+        },
         # Protección de columna A (SKU_ID, auto-calculado)
         {
             "addProtectedRange": {
@@ -179,13 +193,28 @@ def _aplicar_validaciones(sh: gspread.Spreadsheet, hojas: dict) -> None:
                 }
             }
         },
-        # Resaltar columna C (Cantidad) en amarillo claro para guiar al usuario
+        # Resaltar columna C (Cantidad) y G (Cancelar) en amarillo claro para guiar al usuario
         {
             "repeatCell": {
                 "range": {
                     "sheetId": ws_pedidos.id,
                     "startRowIndex": 1, "endRowIndex": 100,
                     "startColumnIndex": 2, "endColumnIndex": 3,
+                },
+                "cell": {
+                    "userEnteredFormat": {
+                        "backgroundColor": {"red": 1.0, "green": 0.95, "blue": 0.8}
+                    }
+                },
+                "fields": "userEnteredFormat.backgroundColor",
+            }
+        },
+        {
+            "repeatCell": {
+                "range": {
+                    "sheetId": ws_pedidos.id,
+                    "startRowIndex": 1, "endRowIndex": 100,
+                    "startColumnIndex": 6, "endColumnIndex": 7,
                 },
                 "cell": {
                     "userEnteredFormat": {

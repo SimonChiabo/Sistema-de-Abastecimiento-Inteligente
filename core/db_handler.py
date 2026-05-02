@@ -115,6 +115,34 @@ def add_to_buffer(sku_id, cantidad, centro_costo, proveedor_id=None, fecha_despa
     finally:
         session.close()
 
+def delete_pending_orders(sku_id, centro_costo):
+    """
+    Elimina los pedidos con estado PENDING o LATE para un SKU y Centro de Costo específico.
+    Se usa cuando el operario cancela un pedido desde la interfaz.
+    """
+    session = Session()
+    try:
+        orders = session.query(OrderBuffer).filter(
+            OrderBuffer.sku_id == sku_id,
+            OrderBuffer.centro_costo == centro_costo,
+            OrderBuffer.status.in_([OrderStatus.PENDING, OrderStatus.LATE])
+        ).all()
+
+        count = len(orders)
+        for order in orders:
+            session.delete(order)
+        
+        session.commit()
+        if count > 0:
+            logger.info("CANCELACIÓN: %d registros eliminados para SKU %s en %s.", count, sku_id, centro_costo)
+        return count
+    except Exception as e:
+        session.rollback()
+        logger.error("Error en delete_pending_orders: %s", e)
+        return 0
+    finally:
+        session.close()
+
 def archive_orders(provider_id, file_path, sku_prices=None):
     """
     Mueve pedidos SENT al historial y los elimina del buffer activo.

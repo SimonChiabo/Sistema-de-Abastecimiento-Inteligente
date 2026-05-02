@@ -10,7 +10,7 @@ import argparse
 from dotenv import load_dotenv
 
 from core.auth import obtener_cliente_gsheets, obtener_spreadsheet_maestro
-from core.db_handler import OrderBuffer, OrderStatus, Session, add_to_buffer
+from core.db_handler import OrderBuffer, OrderStatus, Session, add_to_buffer, delete_pending_orders
 from core.log_config import configurar_logging
 from core.reception import process_reception_feedback, process_claims_feedback
 
@@ -96,9 +96,19 @@ def run_orchestrator(modo_manual: bool = False) -> None:
 
                     cantidad_str = str(fila[2]).strip()
                     confirmado = str(fila[4]).upper() == "TRUE"
+                    cancelar = len(fila) > 6 and str(fila[6]).upper() == "TRUE"
 
-                    # 1. Si hay un pedido nuevo, lo procesamos
-                    if confirmado:
+                    # 1. Si el operario pide cancelar lo acumulado
+                    if cancelar:
+                        logger.info("  [CANCELACIÓN - SKU: %s] Solicitada por local %s", sku_id, nombre_local)
+                        delete_pending_orders(sku_id, nombre_local)
+                        
+                        # Limpiar checkbox de cancelación y log
+                        actualizaciones_batch.append({"range": f"G{indice}", "values": [[False]]})
+                        actualizaciones_batch.append({"range": f"F{indice}", "values": [["CANCELADO"]]})
+
+                    # 2. Si hay un pedido nuevo, lo procesamos
+                    elif confirmado:
                         if cantidad_str:
                             logger.info("  [NUEVO PEDIDO - SKU: %s] Cantidad: %s", sku_id, cantidad_str)
                             cantidad = float(cantidad_str.replace(",", "."))

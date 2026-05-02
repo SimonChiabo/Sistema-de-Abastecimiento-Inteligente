@@ -18,7 +18,11 @@ scratch/
 *.db
 outbox/
 *.csv
+logs/
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Presentacion
+PITCH_PRESENTACION_SAI.md

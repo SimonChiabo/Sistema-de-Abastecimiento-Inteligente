@@ -8,7 +8,7 @@ import os
 from dotenv import load_dotenv
 
 from core.auth import obtener_cliente_gsheets
-from core.db_handler import OrderHistory, Session, update_history_fulfillment, resolve_claim
+from core.db_handler import OrderHistory, MasterSku, Session, update_history_fulfillment, resolve_claim
 
 load_dotenv()
 
@@ -34,6 +34,10 @@ def sync_reception_tab() -> None:
             .all()
         )
 
+        # Obtener nombres de productos de los maestros
+        skus = session.query(MasterSku).all()
+        mapa_sku = {s.sku_id: s.nombre for s in skus}
+
         for entrada in archivos_locales:
             nombre_local = entrada["name"]
             id_local = entrada["id"]
@@ -58,7 +62,7 @@ def sync_reception_tab() -> None:
                 ws.append_row(encabezados)
 
                 filas = [
-                    [h.id, h.sku_id, "", h.cantidad, "", "", "", ""]
+                    [h.id, h.sku_id, mapa_sku.get(h.sku_id, "N/A"), h.cantidad, "", "", "", ""]
                     for h in pedidos_local
                 ]
                 ws.append_rows(filas)

@@ -26,3 +26,9 @@ Thumbs.db
 
 # Presentacion
 PITCH_PRESENTACION_SAI.md
+
+# Documentos internos de trabajo
+REVISION_SAI.md
+
+# Git worktrees
+.worktrees/

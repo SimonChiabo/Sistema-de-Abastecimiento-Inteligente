@@ -93,6 +93,19 @@ HTML_TEMPLATE = """
             font-weight: 600;
             color: var(--primary);
         }
+        .qty-badge-return {
+            background: #fee2e2;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-weight: 600;
+            color: #dc2626;
+        }
+        .return-label {
+            color: #dc2626;
+            font-size: 11px;
+            font-weight: 700;
+            margin-left: 4px;
+        }
         .local-breakdown {
             font-size: 11px;
             color: var(--text-light);
@@ -157,7 +170,12 @@ HTML_TEMPLATE = """
                             </ul>
                         </td>
                         <td class="text-right">
+                            {% if item.cantidad < 0 %}
+                            <span class="qty-badge-return">{{ item.cantidad }}</span>
+                            <div class="return-label">[DEVOLUCIÓN]</div>
+                            {% else %}
                             <span class="qty-badge">{{ item.cantidad }}</span>
+                            {% endif %}
                         </td>
                         <td class="text-right">${{ "{:,.2f}".format(item.precio_unit) }}</td>
                         <td class="text-right" style="font-weight: 600;">${{ "{:,.2f}".format(item.subtotal) }}</td>

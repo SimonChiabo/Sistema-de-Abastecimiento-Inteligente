@@ -25,10 +25,14 @@ def test_smtp_connection() -> None:
     puerto_smtp = int(os.getenv("SMTP_PORT", 587))
     usuario_smtp = os.getenv("SMTP_USER")
     contrasena_smtp = os.getenv("SMTP_PASS")
-    destinatario = os.getenv("ADMIN_EMAIL", "simonchiabo@gmail.com")
+    destinatario = os.getenv("ADMIN_EMAIL")
 
     if not usuario_smtp or not contrasena_smtp:
         logger.error("Faltan SMTP_USER o SMTP_PASS en el archivo .env.")
+        return
+
+    if not destinatario:
+        logger.error("Falta ADMIN_EMAIL en el archivo .env.")
         return
 
     logger.info(

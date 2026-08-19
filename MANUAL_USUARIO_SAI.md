@@ -91,4 +91,4 @@ Para demostraciones o situaciones de emergencia donde se requiere procesar pedid
 ---
 
 > [!IMPORTANT]
-> **SOPORTE TÉCNICO**: Si el sistema no detecta un nuevo local, asegúrese de que el archivo del mismo comience con el prefijo `SAI_Local_` y esté compartido con `sai-bot@sai-sistema-abastecimiento.iam.gserviceaccount.com`.
+> **SOPORTE TÉCNICO**: Si el sistema no detecta un nuevo local, asegúrese de que el archivo del mismo comience con el prefijo `SAI_Local_` y esté compartido con `sai-bot@<TU-PROYECTO-GCP>.iam.gserviceaccount.com`.

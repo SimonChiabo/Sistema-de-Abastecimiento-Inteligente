@@ -352,7 +352,7 @@ def run_mailer(modo_manual: bool = False) -> None:
 
             # Si es modo manual, enviamos una copia al administrador (Demo)
             if modo_manual:
-                destinatario_demo = os.getenv("ADMIN_EMAIL", "simonchiabo@gmail.com")
+                destinatario_demo = os.getenv("ADMIN_EMAIL")
                 logger.info("  [DEMO] Enviando copia de OC a %s...", destinatario_demo)
                 send_generic_email(
                     subject=f"DEMO SAI: Orden de Compra - {nombre_prov}",

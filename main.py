@@ -172,7 +172,7 @@ def run_orchestrator(modo_manual: bool = False) -> None:
     
     if modo_manual:
         from core.notifier import send_generic_email
-        destinatario_demo = os.getenv("ADMIN_EMAIL", "simonchiabo@gmail.com")
+        destinatario_demo = os.getenv("ADMIN_EMAIL")
         logger.info("  [DEMO] Enviando confirmación de captura a %s...", destinatario_demo)
         send_generic_email(
             subject="DEMO SAI: Captura de Pedidos Exitosa",

@@ -35,10 +35,14 @@ def send_audit_report(filename: str, metrics: dict) -> bool:
     puerto_smtp = int(os.getenv("SMTP_PORT", 587))
     usuario_smtp = os.getenv("SMTP_USER")
     contrasena_smtp = os.getenv("SMTP_PASS")
-    destinatario = os.getenv("ADMIN_EMAIL", "simonchiabo@gmail.com")
+    destinatario = os.getenv("ADMIN_EMAIL")
 
     if not usuario_smtp or not contrasena_smtp:
         logger.error("Credenciales SMTP no configuradas en .env. Saltando envío.")
+        return False
+
+    if not destinatario:
+        logger.error("ADMIN_EMAIL no configurado en .env. Saltando envío.")
         return False
 
     # Construir mensaje
@@ -99,6 +103,10 @@ def send_generic_email(subject: str, body: str, to_email: str, is_html: bool = F
 
     if not usuario_smtp or not contrasena_smtp:
         logger.error("Credenciales SMTP no configuradas. No se puede enviar el correo.")
+        return False
+
+    if not to_email:
+        logger.error("Destinatario vacío (¿falta ADMIN_EMAIL en .env?). No se envía.")
         return False
 
     msg = MIMEMultipart()

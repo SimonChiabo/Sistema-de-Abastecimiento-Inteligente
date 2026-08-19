@@ -9,12 +9,16 @@
   <img src="https://img.shields.io/badge/Python-3.9+-blue.svg" alt="Python Version">
   <img src="https://img.shields.io/badge/Google_Sheets-API-34A853.svg" alt="Google Sheets">
   <img src="https://img.shields.io/badge/SQLite-Database-003B57.svg" alt="SQLite">
-  <img src="https://img.shields.io/badge/Status-Production_Ready-brightgreen.svg" alt="Status">
+  <img src="https://img.shields.io/badge/Status-Prototipo_validado-blue.svg" alt="Status">
+  <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License">
 </p>
 
 ---
 
 ## 📖 Descripción del Proyecto
+
+> [!NOTE]
+> **Estado del proyecto.** Diseñado y prototipado para un entorno multi-local real: relevamiento de la operación, modelo de datos y flujo completo funcionando de punta a punta. Fue presentado a dirección financiera y quedó pendiente de implementación. Los datos incluidos en el repositorio son sintéticos (`demo_injector.py`).
 
 El **Sistema de Abastecimiento Inteligente (SAI)** es una solución de backend distribuido diseñada para automatizar la cadena de suministro en múltiples sucursales locales. Combina la accesibilidad y nula curva de aprendizaje de Google Sheets (como frontend) con la robustez transaccional de una base de datos centralizada (SQLite/Cloud SQL) y orquestación en Python.
 
@@ -52,7 +56,7 @@ El ecosistema está dividido en 4 capas fundamentales:
 
 ### 1. Clonar el Repositorio
 ```bash
-git clone https://github.com/TU_USUARIO/Sistema-de-Abastecimiento-Inteligente.git
+git clone https://github.com/SimonChiabo/Sistema-de-Abastecimiento-Inteligente.git
 cd Sistema-de-Abastecimiento-Inteligente
 ```
 
@@ -64,23 +68,31 @@ pip install -r requirements.txt
 ```
 
 ### 3. Variables de Entorno (`.env`)
-Crea un archivo `.env` en el directorio raíz usando como base el archivo de configuración:
+Copiá `.env.example` a `.env` y completá los valores:
+```bash
+cp .env.example .env
+```
 ```env
-# Credenciales de Google
-GOOGLE_APPLICATION_CREDENTIALS=credentials.json
-
-# IDs de Google Sheets
-MASTER_SPREADSHEET_ID=tu_id_del_master
-WAREHOUSE_SPREADSHEET_ID=tu_id_del_warehouse
+# Google Sheets API
+CREDENTIALS_PATH=credentials.json
+MASTER_SPREADSHEET_NAME=SAI - Sistema de Abastecimiento
+LOCAL_PREFIX=SAI_Local_
 
 # Base de datos
 DB_URL=sqlite:///sai_local.db
 
-# Configuración de Orquestación
-LOCAL_PREFIX=SAI_Local_
-WAREHOUSE_SYNC_ENABLED=true
+# Notificaciones (contraseña de aplicación, no la de la cuenta)
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=tu-cuenta@ejemplo.com
+SMTP_PASS=
+ADMIN_EMAIL=tu-cuenta@ejemplo.com
+
+# Sincronización con depósito central (opcional)
+WAREHOUSE_SYNC_ENABLED=false
+WAREHOUSE_SPREADSHEET_ID=
 ```
-*(Debes colocar tu archivo `credentials.json` generado desde Google Cloud Console en el directorio raíz).*
+*(Colocá tu `credentials.json` —cuenta de servicio generada en Google Cloud Console, con Sheets API y Drive API habilitadas— en el directorio raíz. Está en `.gitignore`.)*
 
 ## 🏃‍♂️ Uso Operativo
 
@@ -111,14 +123,16 @@ python demo_injector.py
 │   ├── db_handler.py       # Modelos ORM y lógica de Base de Datos
 │   ├── log_config.py       # Sistema de logs estandarizado
 │   └── reception.py        # Procesamiento de feedback y reclamos multi-local
-├── logs/                   # Archivos de registro diario (.log)
+├── logs/                   # Registro diario (.log, no versionado)
 ├── main.py                 # Orquestador principal (Entrypoint)
 ├── setup_local.py          # Configuración y formateo de templates
 ├── warehouse_sync.py       # Sincronización con Data Studio / Looker
 ├── mailer.py               # Generación y envío de Órdenes de Compra
 ├── audit_job.py            # Reportería ejecutiva
-└── demo_injector.py        # Inyector de mock-data (White-label)
+├── demo_injector.py        # Inyector de datos sintéticos (White-label)
+└── .env.example            # Plantilla de variables de entorno
 ```
 
 ## 🛡️ Licencia
-Este proyecto es de uso privativo. Contactar al autor para permisos de distribución.
+
+Distribuido bajo licencia MIT. Ver [`LICENSE`](LICENSE) para el texto completo.

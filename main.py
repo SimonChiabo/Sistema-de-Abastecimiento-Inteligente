@@ -13,6 +13,7 @@ from core.auth import obtener_cliente_gsheets, obtener_spreadsheet_maestro
 from core.db_handler import OrderBuffer, OrderStatus, Session, add_to_buffer, delete_pending_orders
 from core.log_config import configurar_logging
 from core.reception import process_reception_feedback, process_claims_feedback
+from core.rules import determinar_estado_pedido
 
 load_dotenv()
 
@@ -113,21 +114,12 @@ def run_orchestrator(modo_manual: bool = False) -> None:
                             logger.info("  [NUEVO PEDIDO - SKU: %s] Cantidad: %s", sku_id, cantidad_str)
                             cantidad = float(cantidad_str.replace(",", "."))
 
-                            # Lógica de horarios
+                            # Lógica de horarios (ver core/rules.py)
                             prov_id = sku_a_prov.get(sku_id)
-                            hora_limite_str = hora_limite_prov.get(prov_id, "23:59")
-                            ahora = dt.now().time()
-                            hora_limite = dt.strptime(hora_limite_str, "%H:%M").time()
-
-                            estatus = OrderStatus.PENDING
-                            mensaje_log = f"OK {dt.now().strftime('%H:%M')}"
-
-                            if not modo_manual and ahora > hora_limite:
-                                estatus = OrderStatus.LATE
-                                mensaje_log = f"LATE ({hora_limite_str})"
-
-                            if modo_manual:
-                                mensaje_log = f"MANUAL {dt.now().strftime('%H:%M')}"
+                            hora_limite_str = hora_limite_prov.get(prov_id)
+                            estatus, mensaje_log = determinar_estado_pedido(
+                                dt.now().time(), hora_limite_str, modo_manual
+                            )
 
                             # Registrar en DB local
                             add_to_buffer(sku_id, cantidad, nombre_local, proveedor_id=prov_id, status=estatus)

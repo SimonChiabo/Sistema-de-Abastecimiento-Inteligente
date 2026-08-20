@@ -160,6 +160,31 @@ Para llenar la base de datos y limpiar historiales en ambientes de desarrollo:
 python demo_injector.py
 ```
 
+## 🧪 Tests
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest
+```
+
+19 tests sobre las reglas de negocio. No buscan cobertura alta: buscan **dejar
+escrita la regla**, porque son las decisiones que un refactor puede romper en
+silencio sin que falle nada visible.
+
+| Regla | Qué se verifica |
+|---|---|
+| Corte por horario | Un pedido posterior al corte del proveedor queda `LATE` y entra al ciclo siguiente. A la hora exacta todavía entra. `--manual` saltea el corte. |
+| Consolidación | Dos cargas del mismo SKU en el mismo local son una sola línea; distinto centro de costo **no** consolida; sobre un pedido ya `SENT` tampoco. |
+| Cancelación | Borra `PENDING` y `LATE`, nunca lo ya despachado. |
+| Verdad financiera | Un faltante baja `total_real` (lo que se le paga al proveedor) **sin** reescribir la cantidad pedida. |
+| Reclamos | Resuelto entregado restituye el fill rate a 100%; cancelado sin stock deja el faltante registrado en la métrica del proveedor. |
+
+La suite corre contra una base SQLite temporal: `tests/conftest.py` reapunta el
+engine explícitamente, así que nunca toca `sai_local.db`.
+
+Las reglas puras viven en [`core/rules.py`](core/rules.py), separadas del
+orquestador para que se puedan testear sin red ni base de datos.
+
 ## 📂 Estructura del Proyecto
 
 ```text
@@ -167,7 +192,9 @@ python demo_injector.py
 │   ├── auth.py             # Autenticación con Google APIs
 │   ├── db_handler.py       # Modelos ORM y lógica de Base de Datos
 │   ├── log_config.py       # Sistema de logs estandarizado
-│   └── reception.py        # Procesamiento de feedback y reclamos multi-local
+│   ├── reception.py        # Procesamiento de feedback y reclamos multi-local
+│   └── rules.py            # Reglas de negocio puras (corte horario, fill rate)
+├── tests/                  # Suite de reglas de negocio (pytest)
 ├── logs/                   # Registro diario (.log, no versionado)
 ├── main.py                 # Orquestador principal (Entrypoint)
 ├── setup_local.py          # Configuración y formateo de templates

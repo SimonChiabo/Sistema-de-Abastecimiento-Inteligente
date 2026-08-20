@@ -37,6 +37,51 @@ El ecosistema está dividido en 4 capas fundamentales:
 3. **Orquestador (El Motor):** Scripts en Python (`main.py`) que leen los datos de todos los locales en paralelo, calculan reglas de negocio, y registran estados en una base de datos relacional. Genera órdenes de compra consolidadas por proveedor.
 4. **Data Warehouse (Analítica):** Exportación continua de la "verdad financiera" (`Total_Real`, `Fill Rate`, métricas de proveedores) para visualización ejecutiva.
 
+```mermaid
+flowchart LR
+    subgraph C1["1 · Master"]
+        M["Google Sheet maestro<br/>MASTER_SKU · MASTER_PROV<br/>precios y horarios de corte"]
+    end
+
+    subgraph C2["2 · Locales"]
+        L["Un Sheet por sucursal<br/>PEDIDOS · STOCK<br/>RECEPCION · RECLAMOS"]
+    end
+
+    subgraph C3["3 · Orquestador"]
+        direction LR
+        O["main.py"] --> D{"¿Antes del<br/>horario de corte?"}
+        D -->|sí| B[("order_buffer<br/>consolida por<br/>SKU + centro de costo")]
+        D -->|no| T["LATE"]
+        T -.->|próximo ciclo| B
+        B --> E["mailer.py<br/>OC consolidada<br/>por proveedor"]
+        E -->|entrega| R["Recepción<br/>y reclamos"]
+        R --> H[("order_history<br/>SENT · COMPLETE<br/>PARTIAL · CANCELLED")]
+    end
+
+    subgraph C4["4 · Analítica"]
+        W["warehouse_sync.py<br/>Total_Real · Fill Rate"]
+    end
+
+    M -->|catálogo y reglas| L --> O
+    H --> W
+
+    style T fill:#78350f,stroke:#f59e0b,color:#fff
+    style D fill:#1e3a5f,stroke:#3b82f6,color:#fff
+    style R fill:#064e3b,stroke:#10b981,color:#fff
+```
+
+Dos nodos concentran la lógica de negocio que justifica el sistema:
+
+- **El rombo del horario de corte.** Cada proveedor tiene su propia `hora_limite`.
+  Un pedido cargado después pasa a `LATE` en lugar de perderse o de colarse en una
+  orden ya cerrada: entra al ciclo siguiente. El modo `--manual` saltea este corte
+  para demostraciones.
+- **«Recepción y reclamos» (en verde).** Un faltante o un producto dañado impacta
+  la métrica financiera del proveedor **sin** alterar el inventario, que solo
+  registra lo que efectivamente llegó. Separar esas dos cosas es lo que evita que
+  un reclamo infle el stock teórico, y es la regla más fácil de romper en un
+  refactor.
+
 ## ✨ Características Principales
 
 - **Validaciones Inteligentes:** "Semáforos" visuales en celdas, protección contra escritura de columnas clave y dropdowns auto-completados.

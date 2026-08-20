@@ -160,6 +160,75 @@ Para llenar la base de datos y limpiar historiales en ambientes de desarrollo:
 python demo_injector.py
 ```
 
+## 🔮 Proyección de pedidos y backtesting
+
+```bash
+python forecast_report.py
+```
+
+El orquestador automatiza la captura de pedidos, pero no decide **cuánto** pedir:
+eso lo sigue poniendo a mano el encargado de cada local. `core/forecast.py` es el
+modelo que responde esa pregunta.
+
+| Paso | Qué hace |
+|---|---|
+| Consumo base | Promedio móvil de los últimos N días. El consumo de hace seis meses no informa sobre el de esta semana. |
+| Estacionalidad | Factor por día de semana. Un pedido del jueves que llega el domingo atraviesa el fin de semana, que es cuando más se consume. |
+| Stock de seguridad | `z · desvío · √lead_time`. Con la raíz y no con el lead time entero: los desvíos diarios se compensan parcialmente. |
+| Punto de reorden | Consumo esperado durante el lead time + stock de seguridad. |
+| Sugerencia | `punto_de_reorden − stock_actual − pendiente_de_recepción`. Restar lo pendiente evita el error clásico: volver a pedir lo que ya viene en camino. |
+
+### El backtest
+
+Un modelo sin evaluación es una idea. `core/backtest.py` reproduce una serie de
+consumo día por día y mide qué habría pasado, comparando **tres** políticas sobre
+exactamente el mismo consumo.
+
+La tercera existe para no atribuirle a la estacionalidad un mérito que es del
+colchón: comparar "promedio sin colchón" contra "estacional con colchón" mezcla
+los dos efectos.
+
+Resultado sobre una serie sintética de 180 días (`SEMILLA=42`, consumo base 20/día,
+ruido gaussiano 25%, lead time 3 días):
+
+| Política | Quiebres | Servicio | Stock prom. |
+|---|---|---|---|
+| **Serie con estacionalidad semanal** | | | |
+| Promedio plano | 42 | 72,4% | 9,5 |
+| Promedio + stock de seguridad | 11 | 92,8% | 26,9 |
+| Estacional + stock de seguridad | **8** | **94,7%** | **26,4** |
+| **Serie plana (control)** | | | |
+| Promedio + stock de seguridad | **7** | **95,4%** | **13,4** |
+| Estacional + stock de seguridad | 11 | 92,8% | 13,6 |
+
+Lo que dice el backtest, sin adornos:
+
+- **El grueso de la mejora es el stock de seguridad**, no la estacionalidad: 31 de
+  los 34 días de quiebre evitados. Y se paga con inventario, de 9,5 a 26,9 unidades
+  promedio.
+- **Modelar el día de semana aporta poco pero aporta**: 3 quiebres menos con
+  levemente *menos* stock. Ganar en las dos dimensiones a la vez es lo que lo hace
+  una mejora real y no un intercambio.
+- **Cuando la estacionalidad no existe, el modelo pierde**: en la serie plana
+  provoca 4 quiebres más que el promedio simple, porque ajusta ruido como si fuera
+  estructura.
+
+La serie de control está justamente para eso. Generar consumo con estacionalidad y
+después mostrar que la política que modela estacionalidad gana no probaría nada:
+la respuesta estaría construida dentro del dato.
+
+> [!NOTE]
+> **Datos sintéticos.** La serie se genera con los parámetros que el propio reporte
+> imprime. Esto demuestra el **método de evaluación**, no un resultado obtenido en
+> producción.
+>
+> **Dos puntos de integración pendientes.** `MASTER_PROV` no guarda un lead time
+> real: el modelo lo recibe como parámetro y puede derivar un piso desde
+> `dias_programados` (días hasta la próxima entrega programada). Y el stock actual
+> vive en la pestaña `STOCK` de cada local, que hoy `setup_local.py` crea pero
+> ningún módulo lee. Por eso `stock_actual` y `pendiente_recepcion` entran como
+> argumentos: el modelo está listo, la ingesta es el paso siguiente.
+
 ## 🧪 Tests
 
 ```bash
@@ -167,7 +236,7 @@ pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-19 tests sobre las reglas de negocio. No buscan cobertura alta: buscan **dejar
+41 tests: reglas de negocio, modelo de proyección y motor de backtesting. No buscan cobertura alta: buscan **dejar
 escrita la regla**, porque son las decisiones que un refactor puede romper en
 silencio sin que falle nada visible.
 
@@ -193,7 +262,11 @@ orquestador para que se puedan testear sin red ni base de datos.
 │   ├── db_handler.py       # Modelos ORM y lógica de Base de Datos
 │   ├── log_config.py       # Sistema de logs estandarizado
 │   ├── reception.py        # Procesamiento de feedback y reclamos multi-local
-│   └── rules.py            # Reglas de negocio puras (corte horario, fill rate)
+│   ├── rules.py            # Reglas de negocio puras (corte horario, fill rate)
+│   ├── forecast.py         # Modelo de proyección de pedidos (puro)
+│   ├── politicas.py        # Políticas de reposición comparables
+│   └── backtest.py         # Motor de simulación día por día
+├── forecast_report.py      # Backtest comparativo sobre datos sintéticos
 ├── tests/                  # Suite de reglas de negocio (pytest)
 ├── logs/                   # Registro diario (.log, no versionado)
 ├── main.py                 # Orquestador principal (Entrypoint)

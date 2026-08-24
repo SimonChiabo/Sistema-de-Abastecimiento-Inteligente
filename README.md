@@ -9,7 +9,6 @@ pidió, qué llegó y qué se le debe a cada proveedor.
   <img src="https://img.shields.io/badge/Google_Sheets-API-34A853.svg" alt="Google Sheets">
   <img src="https://img.shields.io/badge/SQLAlchemy-SQLite-003B57.svg" alt="SQLAlchemy">
   <img src="https://img.shields.io/badge/Estado-Diseñado_·_no_implementado-orange.svg" alt="Estado">
-  <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT">
 </p>
 
 ---
@@ -101,6 +100,38 @@ ese pedido y no al ciclo, y la verdad vive en la base de datos, no en la hoja.
 
 ---
 
+## La segunda decisión: la orden de compra no sale sola
+
+El piloto que se demostró a la dirección financiera enviaba los pedidos
+consolidados directamente a los proveedores: el ciclo corría de punta a punta sin
+intervención. Al planificar el paso a producción esa capacidad se degradó a
+propósito. La orden queda preparada como un correo listo para reenviar, y el
+envío al proveedor pasa por una persona del equipo interno que lo revisa antes.
+
+La alternativa era conservar el envío automático, que ya estaba construido y
+funcionando. Se descartó por lo que cuesta un error en ese punto exacto: un
+pedido mal consolidado que sale solo es gasto comprometido con un tercero, y
+revertirlo depende de la buena voluntad del proveedor. El mismo pedido detenido
+esperando una revisión es un archivo que se corrige. El corte por horario y las
+validaciones del Sheet bajan la probabilidad de ese error; no la eliminan.
+
+El trade-off es explícito y no conviene disimularlo: **se pierde la automatización
+completa** —alguien tiene que estar— **y se gana un punto de control sobre el gasto
+antes de que quede comprometido con un tercero.** En un circuito cuyo problema
+original era la falta de visibilidad sobre lo comprometido, poner el control ahí
+es coherente con el resto del diseño.
+
+**Qué hay en este repositorio.** El código publicado corresponde al estado
+posterior a esa decisión, y un paso más atrás todavía: `mailer.py` consolida por
+proveedor y escribe la orden como archivo HTML en `outbox/`, y no la envía a
+nadie. La columna `Email` de `MASTER_PROV` se sincroniza a la base local y ningún
+módulo la lee. El único correo que sale de esa ruta es una copia al administrador
+bajo `--manual`, para demostraciones. Falta construir el envío interno —el correo
+listo para reenviar— y con él lo que ese envío obliga a resolver: confirmación de
+entrega, reintentos, y un registro de qué se mandó a quién y cuándo.
+
+---
+
 ## Cómo funciona
 
 Cuatro capas. Las dos primeras son hojas de cálculo, las dos últimas son Python.
@@ -131,7 +162,7 @@ flowchart LR
         D -->|no| T["LATE"]
         T -.->|próximo ciclo| B
         B --> E["mailer.py<br/>OC consolidada HTML<br/>en outbox/"]
-        E -.->|entrega al proveedor:<br/>fuera del alcance actual| R["Recepción<br/>y reclamos"]
+        E -.->|revisión humana interna<br/>antes de enviar al proveedor| R["Recepción<br/>y reclamos"]
         R --> H[("order_history<br/>SENT · COMPLETE · CANCELLED<br/>PENDING_RECTIFICATION<br/>COMPLETE_RECTIFIED · PARTIAL_CLOSED")]
     end
 
@@ -162,10 +193,13 @@ registra lo que efectivamente llegó. Separar esas dos cosas es lo que evita que
 un reclamo infle el stock teórico, y es la regla más fácil de romper en un
 refactor sin que falle nada visible.
 
-La flecha punteada entre la OC y la recepción marca un límite honesto: el sistema
-**genera** la orden de compra consolidada como archivo HTML por proveedor, pero
-no la envía. Enviarla al proveedor es un paso pendiente, no una función
-implementada. Ver [Limitaciones](#limitaciones-y-próximos-pasos).
+La flecha punteada entre la OC y la recepción es la decisión de diseño de la
+sección anterior, dibujada: el orquestador consolida la orden y ahí se detiene a
+propósito, esperando la revisión interna que autoriza el envío. En este
+repositorio ese tramo no está construido —`mailer.py` deja la orden como archivo
+HTML en `outbox/` y no envía nada—, así que la línea punteada marca a la vez una
+decisión y un pendiente. Ver
+[La orden de compra no sale sola](#la-segunda-decisión-la-orden-de-compra-no-sale-sola).
 
 ---
 
@@ -219,43 +253,58 @@ los dos efectos.
 Resultado sobre una serie sintética de 180 días (semilla 42, consumo base 20/día,
 ruido gaussiano de 25%, lead time 3 días). Los primeros 28 días son de
 calentamiento y no se miden: sin eso se compararía una política con historial
-contra una sin historial. Quedan **152 días medidos**, y las tres columnas se
+contra una sin historial. Quedan **152 días medidos**, y las cuatro columnas se
 definen sobre ese período:
 
 - **Quiebres** — días medidos en los que el stock no alcanzó a cubrir el consumo
   del día, aunque el faltante fuera de una unidad.
-- **Servicio** — `1 − quiebres / 152`, es decir la proporción de días medidos que
-  cerraron sin faltante. Cuenta días, no unidades: un día al que le faltó una
-  unidad pesa igual que uno al que le faltaron cincuenta.
+- **Ud. faltantes** — suma de las unidades de consumo que el stock no llegó a
+  cubrir, acumulada sobre los días medidos. La demanda no servida se pierde, no
+  se arrastra: `core/backtest.py` descuenta del stock únicamente lo que sí se
+  sirvió, y el faltante se registra sin volver a pedirse al día siguiente.
+- **Servicio** — `1 − quiebres / 152`, la proporción de días medidos que cerraron
+  sin faltante. Se deriva de la primera columna, no de la segunda.
 - **Stock prom.** — stock promedio al cierre del día, después de consumir, sobre
   los días medidos.
 
-| Política | Quiebres | Servicio | Stock prom. |
-|---|---|---|---|
-| **Serie con estacionalidad semanal** | | | |
-| Promedio plano | 42 | 72,4% | 9,5 |
-| Promedio + stock de seguridad | 11 | 92,8% | 26,9 |
-| Estacional + stock de seguridad | **8** | **94,7%** | **26,4** |
-| **Serie plana (control)** | | | |
-| Promedio + stock de seguridad | **7** | **95,4%** | **13,4** |
-| Estacional + stock de seguridad | 11 | 92,8% | 13,6 |
+**Serie con estacionalidad semanal** — el caso que el modelo asume:
 
-Que el servicio cuente días y no unidades es una limitación deliberada de la
-métrica y conviene tenerla presente al leer la tabla: es estricta con los
-faltantes chicos y benévola con los grandes. `forecast_report.py` imprime además
-las unidades no servidas de cada política, que es la cara complementaria.
+| Política | Quiebres | Ud. faltantes | Servicio | Stock prom. |
+|---|---|---|---|---|
+| Promedio plano | 42 | 468,9 | 72,4% | 9,5 |
+| Promedio + stock de seguridad | 11 | 80,4 | 92,8% | 26,9 |
+| Estacional + stock de seguridad | **8** | **53,0** | **94,7%** | **26,4** |
+
+**Serie plana, sin estructura por día de semana** — control:
+
+| Política | Quiebres | Ud. faltantes | Servicio | Stock prom. |
+|---|---|---|---|---|
+| Promedio + stock de seguridad | **7** | **12,4** | **95,4%** | **13,4** |
+| Estacional + stock de seguridad | 11 | 26,1 | 92,8% | 13,6 |
+
+Las dos primeras columnas se leen juntas y ninguna alcanza sola. «Quiebres» y
+«Servicio» cuentan días y son ciegos al tamaño del faltante: un día al que le
+faltó una unidad pesa igual que uno al que le faltaron cincuenta. «Ud. faltantes»
+mide el tamaño pero no dice en cuántos días se repartió. Una política solo es
+claramente mejor si gana en las dos, y a igual o menor stock.
 
 Lo que dice el backtest, sin adornos:
 
-- **El grueso de la mejora es el stock de seguridad**, no la estacionalidad: 31 de
-  los 34 días de quiebre evitados. Y se paga con inventario, de 9,5 a 26,9
-  unidades promedio.
-- **Modelar el día de semana aporta poco pero aporta**: 3 quiebres menos con
-  levemente *menos* stock. Ganar en las dos dimensiones a la vez es lo que lo hace
-  una mejora real y no un intercambio.
-- **Cuando la estacionalidad no existe, el modelo pierde**: en la serie plana
-  provoca 4 quiebres más que el promedio simple, porque ajusta ruido como si fuera
-  estructura.
+- **El grueso de la mejora es el stock de seguridad**, no la estacionalidad.
+  Evita 31 de los 34 días de quiebre y 388,5 de las 415,9 unidades no servidas:
+  cerca del 93% de la mejora, se mire por donde se mire. Y se paga con
+  inventario, de 9,5 a 26,9 unidades promedio.
+- **Modelar el día de semana aporta poco en días y algo más en unidades.** Los 3
+  quiebres que evita son el 27,3% de los que quedaban (11 → 8); las 27,4 unidades
+  que recupera son el 34,1% de las que faltaban (80,4 → 53,0). Que el segundo
+  porcentaje sea mayor es justamente lo que la columna de días no puede mostrar:
+  el faltante promedio de un día malo baja de 7,3 a 6,6 unidades. Y lo consigue
+  con levemente *menos* stock, 26,4 contra 26,9, que es lo que lo vuelve una
+  mejora y no un intercambio.
+- **Cuando la estacionalidad no existe, el modelo pierde, y pierde en las dos
+  métricas**: en la serie plana provoca 4 quiebres más que el promedio simple
+  (7 → 11) y más que duplica las unidades no servidas (12,4 → 26,1), porque
+  ajusta ruido como si fuera estructura.
 
 La serie de control está justamente para eso. Generar consumo con estacionalidad
 y después mostrar que la política que modela estacionalidad gana no probaría
@@ -310,7 +359,7 @@ separadas del orquestador para que se puedan testear sin red ni base de datos.
 | Interfaz de usuario | Google Sheets (`gspread`) | Adopción sin curva de aprendizaje. Es la decisión de diseño central, no una comodidad. |
 | Orquestación | Python 3.9+ | Reglas de negocio en módulos puros, sin dependencias de red ni de base. |
 | Persistencia | SQLAlchemy sobre SQLite | Una única fuente de verdad transaccional. El `DB_URL` es configurable: apuntar a PostgreSQL o Cloud SQL no requiere cambiar código. |
-| Generación de OCs | Jinja2 → HTML | Documento por proveedor, versionable y diffeable. `jinja2` todavía no figura en `requirements.txt`: ver [`docs/SETUP.md`](docs/SETUP.md). |
+| Generación de OCs | Jinja2 → HTML | Documento por proveedor, versionable y diffeable. |
 | Notificación | `smtplib` (SMTP) | Reporte de auditoría con CSV adjunto al administrador. |
 | Analítica | CSV + spreadsheet de BI | Consumible desde Looker Studio o Power BI sin acoplar el orquestador a una herramienta de visualización. |
 | Tests | pytest | 41 tests sobre reglas de negocio, proyección y backtesting. |
@@ -345,15 +394,9 @@ la base de datos y los archivos generados están en `.gitignore`.
 ## Limitaciones y próximos pasos
 
 Lo que no está resuelto, en orden de qué haría falta primero para llevarlo a
-producción.
-
-**El envío de la OC al proveedor no está implementado.** `mailer.py` renderiza la
-orden consolidada a `outbox/` y la archiva en el historial, pero no la manda.
-`MASTER_PROV` tiene la columna `Email` y se sincroniza a la base local, y nadie la
-lee. El único correo en esa ruta es una copia al administrador bajo `--manual`,
-para demostraciones. Falta el envío real, y con él lo que un envío real obliga a
-resolver: confirmación de entrega, reintentos y un registro de qué se mandó a
-quién y cuándo.
+producción. El envío de la orden al proveedor no figura acá: no es una
+funcionalidad que falte sino una que se retiró a propósito, y está explicada en
+[La orden de compra no sale sola](#la-segunda-decisión-la-orden-de-compra-no-sale-sola).
 
 **El stock físico no entra al sistema.** `setup_local.py` crea la pestaña `STOCK`
 y ningún módulo la lee. Sin esa ingesta, el modelo de proyección recibe
@@ -378,8 +421,3 @@ repositorio que devuelva estructuras de datos, con Sheets detrás, dejaría el
 orquestador testeable de punta a punta sin red y haría que cambiar de frontend
 —si algún día la adopción deja de ser el problema— fuera un cambio local.
 
----
-
-## Licencia
-
-MIT. Ver [`LICENSE`](LICENSE).

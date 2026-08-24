@@ -21,18 +21,6 @@ source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-> [!IMPORTANT]
-> `requirements.txt` no declara `jinja2`, y `mailer.py` lo importa. Con una
-> instalación limpia, `python mailer.py` falla con `ModuleNotFoundError: No
-> module named 'jinja2'`. Hasta que se agregue a `requirements.txt`, hay que
-> instalarlo aparte:
->
-> ```bash
-> pip install jinja2
-> ```
->
-> El resto del proyecto —los tests y `forecast_report.py`— no lo necesita.
-
 ## Variables de entorno
 
 Copiá la plantilla y completá los valores:

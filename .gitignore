@@ -24,11 +24,12 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Presentacion
+# Documentos internos: contienen datos de la empresa donde se origino el
+# diseno (cantidad de locales, ubicacion, detalle operativo). El repositorio
+# publico es una version desvinculada.
 PITCH_PRESENTACION_SAI.md
-
-# Documentos internos de trabajo
 REVISION_SAI.md
+MANUAL_USUARIO_SAI.md
 
 # Git worktrees
 .worktrees/
